@@ -28,7 +28,7 @@ The ReRoute mobile interface includes separate experiences for drivers and dispa
 ### Driver Panel
 | Driver Dashboard | Report Incident — Form | Report Incident — AI Parser |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/driver-dashboard.png" width="220" alt="Driver Dashboard"> | <img src="docs/screenshots/driver-form.png" width="220" alt="Driver Form"> | <img src="docs/screenshots/driver-parser.png" width="220" alt="Driver Parser"> |
+| <img src="docs/screenshots/driver-dashboard.jpeg" width="220" alt="Driver Dashboard"> | <img src="docs/screenshots/driver-form.png" width="220" alt="Driver Form"> | <img src="docs/screenshots/driver-parser.png" width="220" alt="Driver Parser"> |
 
 ### Admin / Dispatcher Panel
 | Dispatcher Dashboard | Route Map | Fleet Overview | Delivery Manifest |
