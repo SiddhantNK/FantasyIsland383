@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
 class DriverScreen extends StatefulWidget {
@@ -20,13 +21,15 @@ class DriverScreen extends StatefulWidget {
 }
 
 class _DriverScreenState extends State<DriverScreen> {
-  String _selectedVehicleId = 'V01';
+  late String _selectedVehicleId;
   List<DisruptionModel> _recentReports = [];
   bool _loadingReports = false;
 
   @override
   void initState() {
     super.initState();
+    // Default to the driver's assigned vehicle or V01
+    _selectedVehicleId = AuthService.currentUser?.vehicleId ?? 'V01';
     _loadRecentReports();
   }
 
@@ -73,286 +76,367 @@ class _DriverScreenState extends State<DriverScreen> {
   Widget build(BuildContext context) {
     final vehicle = _currentVehicle;
     final stops = vehicle?.stops ?? [];
+    final isCompact = MediaQuery.of(context).size.width < 500;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header & Vehicle Selector
-          Row(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Driver Dispatch View',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textMain,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Active Shift Route & Live Incident Reporting',
-                    style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
-                  ),
-                ],
+    return RefreshIndicator(
+      onRefresh: () async {
+        widget.onRefresh();
+        await _loadRecentReports();
+      },
+      color: AppTheme.primary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.symmetric(
+          horizontal: isCompact ? 16 : 24,
+          vertical: 16,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header ──────────────────────────────────────────────
+            const Text(
+              'My Route',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textMain,
+                letterSpacing: -0.5,
               ),
-              const Spacer(),
-              // Vehicle Selector Segment
-              Container(
-                padding: const EdgeInsets.all(3.5),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceElevated,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Row(
-                  children: ['V01', 'V02', 'V03'].map((vId) {
-                    final selected = _selectedVehicleId == vId;
-                    return InkWell(
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Active shift route & incident reporting',
+              style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Vehicle Selector ────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceElevated,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                children: (widget.plan?.vehicles.map((v) => v.id).toList() ?? ['V01', 'V02', 'V03'])
+                    .map((vId) {
+                  final selected = _selectedVehicleId == vId;
+                  return Expanded(
+                    child: GestureDetector(
                       onTap: () => setState(() => _selectedVehicleId = vId),
-                      borderRadius: BorderRadius.circular(7),
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6.5),
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
                           color: selected ? AppTheme.surfaceWhite : Colors.transparent,
-                          borderRadius: BorderRadius.circular(7),
+                          borderRadius: BorderRadius.circular(8),
                           boxShadow: selected ? AppTheme.shadowSm : null,
                           border: Border.all(
                             color: selected ? AppTheme.border : Colors.transparent,
-                            width: 1,
                           ),
                         ),
-                        child: Text(
-                          vId,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: selected ? AppTheme.primary : AppTheme.textMuted,
+                        child: Center(
+                          child: Text(
+                            vId,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: selected ? AppTheme.primary : AppTheme.textMuted,
+                            ),
                           ),
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
+                    ),
+                  );
+                }).toList(),
               ),
-            ],
-          ),
-          const SizedBox(height: 20),
+            ),
+            const SizedBox(height: 16),
 
-          // Vehicle Status Card
-          if (vehicle != null) ...[
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceWhite,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: vehicle.isFailed ? AppTheme.rose.withValues(alpha: 0.5) : AppTheme.border,
+            // ── Vehicle Status Card ─────────────────────────────────
+            if (vehicle != null) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceWhite,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: vehicle.isFailed
+                        ? AppTheme.rose.withValues(alpha: 0.4)
+                        : AppTheme.border,
+                  ),
+                  boxShadow: AppTheme.shadowSm,
                 ),
-                boxShadow: AppTheme.shadowSm,
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-                        decoration: BoxDecoration(
-                          color: vehicle.isFailed ? AppTheme.roseSoft : AppTheme.emeraldSoft,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: vehicle.isFailed
-                                ? AppTheme.rose.withValues(alpha: 0.3)
-                                : AppTheme.emerald.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              vehicle.isFailed ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-                              size: 14,
-                              color: vehicle.isFailed ? AppTheme.rose : AppTheme.emerald,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Status badge
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: vehicle.isFailed ? AppTheme.roseSoft : AppTheme.emeraldSoft,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: vehicle.isFailed
+                                  ? AppTheme.rose.withValues(alpha: 0.3)
+                                  : AppTheme.emerald.withValues(alpha: 0.3),
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              vehicle.isFailed ? 'FAILED AT ${vehicle.failedAt}' : 'ACTIVE & RUNNING',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                vehicle.isFailed
+                                    ? Icons.error_outline_rounded
+                                    : Icons.check_circle_outline_rounded,
+                                size: 14,
                                 color: vehicle.isFailed ? AppTheme.rose : AppTheme.emerald,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Text(
+                                vehicle.isFailed
+                                    ? 'FAILED AT ${vehicle.failedAt}'
+                                    : 'ACTIVE',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: vehicle.isFailed ? AppTheme.rose : AppTheme.emerald,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: _openReportDialog,
-                        icon: const Icon(Icons.warning_amber_rounded, size: 16),
-                        label: const Text('Report Disruption'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.amber,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                        const Spacer(),
+                        Text(
+                          '${stops.length} stops',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Utilization Bars
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _utilizationBar(
-                          'Weight Capacity',
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    // Capacity bars
+                    _CapacityBar(
+                      label: 'Weight',
+                      value:
                           '${vehicle.pendingWeightKg.toStringAsFixed(0)} / ${vehicle.weightCapKg.toStringAsFixed(0)} kg',
-                          vehicle.weightUtilPct,
-                          AppTheme.primary,
+                      pct: vehicle.weightUtilPct,
+                      color: AppTheme.primary,
+                    ),
+                    const SizedBox(height: 10),
+                    _CapacityBar(
+                      label: 'Volume',
+                      value:
+                          '${vehicle.pendingVolumeM3.toStringAsFixed(1)} / ${vehicle.volumeCapM3.toStringAsFixed(1)} m³',
+                      pct: vehicle.volumeUtilPct,
+                      color: AppTheme.indigo,
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceWhite,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.border),
+                  boxShadow: AppTheme.shadowSm,
+                ),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.route_outlined, size: 32, color: AppTheme.textDim),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'No active plan yet',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textSecondary,
                         ),
                       ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: _utilizationBar(
-                          'Volume Capacity',
-                          '${vehicle.pendingVolumeM3.toStringAsFixed(1)} / ${vehicle.volumeCapM3.toStringAsFixed(1)} m³',
-                          vehicle.volumeUtilPct,
-                          AppTheme.indigo,
-                        ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Ask your dispatcher to generate the initial plan.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceWhite,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border),
-                boxShadow: AppTheme.shadowSm,
-              ),
-              child: const Center(
-                child: Text(
-                  'No active plan generated yet. Generate an initial plan in Dispatcher view.',
-                  style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
                 ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
-
-          // Route Stops Timeline
-          const Text(
-            'Assigned Route Manifest',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textMain,
-              letterSpacing: -0.2,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          if (stops.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceWhite,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border),
-                boxShadow: AppTheme.shadowSm,
-              ),
-              child: const Center(
-                child: Text(
-                  'No stops assigned to this vehicle in current plan.',
-                  style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                ),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: stops.length,
-              separatorBuilder: (context, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final stop = stops[index];
-                return _StopCard(stop: stop, index: index + 1);
-              },
-            ),
-
-          const SizedBox(height: 24),
-
-          // Recent Driver Reports Status
-          Row(
-            children: [
-              const Text(
-                'Recent Incident Reports',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textMain,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: _loadRecentReports,
-                icon: const Icon(Icons.sync_rounded, size: 15),
-                label: const Text('Refresh'),
               ),
             ],
-          ),
-          const SizedBox(height: 10),
-          if (_loadingReports)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+            const SizedBox(height: 16),
+
+            // ── Report Disruption FAB-style button ──────────────────
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _openReportDialog,
+                icon: const Icon(Icons.warning_amber_rounded, size: 20),
+                label: const Text('Report Disruption'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.amber,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
               ),
-            )
-          else if (_recentReports.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceWhite,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.border),
-                boxShadow: AppTheme.shadowSm,
+            ),
+            const SizedBox(height: 24),
+
+            // ── Route Stops ─────────────────────────────────────────
+            Row(
+              children: [
+                const Text(
+                  'Route Manifest',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textMain,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const Spacer(),
+                if (stops.isNotEmpty)
+                  Text(
+                    '${stops.length} stops assigned',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            if (stops.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceWhite,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: const Center(
+                  child: Text(
+                    'No stops assigned to this vehicle.',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                  ),
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: stops.length,
+                itemBuilder: (context, index) {
+                  return _StopCard(stop: stops[index], index: index + 1);
+                },
               ),
-              child: const Text('No incidents submitted recently.',
-                  style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
-            )
-          else
-            ..._recentReports.map((inc) => _IncidentStatusTile(incident: inc)),
-        ],
+
+            const SizedBox(height: 24),
+
+            // ── Recent Incident Reports ─────────────────────────────
+            Row(
+              children: [
+                const Text(
+                  'Recent Reports',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textMain,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _loadRecentReports,
+                  icon: const Icon(Icons.sync_rounded, size: 14),
+                  label: const Text('Refresh', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_loadingReports)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                ),
+              )
+            else if (_recentReports.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceWhite,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, size: 18, color: AppTheme.emerald),
+                    SizedBox(width: 10),
+                    Text(
+                      'No incidents submitted yet.',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ..._recentReports.map((inc) => _IncidentStatusTile(incident: inc)),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
+}
 
-  Widget _utilizationBar(String title, String subtitle, double pct, Color color) {
+// ─── Capacity Bar ────────────────────────────────────────────────────────────
+class _CapacityBar extends StatelessWidget {
+  final String label;
+  final String value;
+  final double pct;
+  final Color color;
+
+  const _CapacityBar({
+    required this.label,
+    required this.value,
+    required this.pct,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(title, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-            Text(
-              subtitle,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMain),
-            ),
+            Text(label,
+                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w500)),
+            Text(value,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textMain)),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         ClipRRect(
           borderRadius: BorderRadius.circular(6),
           child: LinearProgressIndicator(
@@ -367,6 +451,7 @@ class _DriverScreenState extends State<DriverScreen> {
   }
 }
 
+// ─── Stop Card ───────────────────────────────────────────────────────────────
 class _StopCard extends StatelessWidget {
   final StopModel stop;
   final int index;
@@ -405,54 +490,52 @@ class _StopCard extends StatelessWidget {
     final softColor = _badgeSoftColor(stop.status);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppTheme.surfaceWhite,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
         boxShadow: AppTheme.shadowSm,
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Sequence index badge
+          // Index circle
           Container(
-            width: 30,
-            height: 30,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              color: AppTheme.surfaceElevated,
+              color: softColor,
               shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.border),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
             ),
             child: Center(
               child: Text(
                 '$index',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textSecondary),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
               ),
             ),
           ),
-          const SizedBox(width: 14),
-          // Info
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Text(
-                      'Stop: ${stop.locationId}',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+                    Expanded(
+                      child: Text(
+                        stop.locationId,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '(${stop.orderId})',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                    ),
-                    const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: softColor,
-                        borderRadius: BorderRadius.circular(5),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: color.withValues(alpha: 0.3)),
                       ),
                       child: Text(
@@ -462,28 +545,31 @@ class _StopCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 4),
+                Text(
+                  'Order ${stop.orderId}',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                ),
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.schedule_rounded, size: 13, color: AppTheme.textDim),
+                    const Icon(Icons.schedule_rounded, size: 12, color: AppTheme.textDim),
                     const SizedBox(width: 4),
                     Text(
-                      'Arrival: ${stop.arrival ?? "--:--"} | Departure: ${stop.departure ?? "--:--"}',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      '${stop.arrival ?? "--:--"} → ${stop.departure ?? "--:--"}',
+                      style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                     ),
                     if (stop.window != null) ...[
-                      const SizedBox(width: 12),
-                      const Icon(Icons.timer_outlined, size: 13, color: AppTheme.textDim),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 8),
                       Text(
                         'Window: ${stop.window}',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                        style: const TextStyle(fontSize: 11, color: AppTheme.textDim),
                       ),
                     ],
                   ],
                 ),
                 if (stop.reason != null) ...[
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 4),
                   Text(
                     stop.reason!,
                     style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: color),
@@ -498,6 +584,7 @@ class _StopCard extends StatelessWidget {
   }
 }
 
+// ─── Incident Status Tile ────────────────────────────────────────────────────
 class _IncidentStatusTile extends StatelessWidget {
   final DisruptionModel incident;
   const _IncidentStatusTile({required this.incident});
@@ -522,26 +609,29 @@ class _IncidentStatusTile extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppTheme.surfaceWhite,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
         boxShadow: AppTheme.shadowSm,
       ),
       child: Row(
         children: [
+          // Source badge
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
             decoration: BoxDecoration(
               color: incident.source == 'AI_PARSER' ? AppTheme.indigoSoft : AppTheme.surfaceElevated,
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(5),
               border: Border.all(
-                color: incident.source == 'AI_PARSER' ? AppTheme.indigo.withValues(alpha: 0.3) : AppTheme.border,
+                color: incident.source == 'AI_PARSER'
+                    ? AppTheme.indigo.withValues(alpha: 0.3)
+                    : AppTheme.border,
               ),
             ),
             child: Text(
-              incident.source,
+              incident.source == 'AI_PARSER' ? 'AI' : 'Form',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
@@ -555,7 +645,7 @@ class _IncidentStatusTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${incident.eventType} (ID #${incident.id})',
+                  '${incident.eventType} #${incident.id}',
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textMain),
                 ),
                 if (incident.rawText != null)
@@ -577,7 +667,7 @@ class _IncidentStatusTile extends StatelessWidget {
             ),
             child: Text(
               incident.status,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color),
             ),
           ),
         ],
@@ -586,6 +676,7 @@ class _IncidentStatusTile extends StatelessWidget {
   }
 }
 
+// ─── Incident Report Bottom Sheet ────────────────────────────────────────────
 class _IncidentReportSheet extends StatefulWidget {
   final String defaultVehicleId;
   final List<LocationModel> locations;
@@ -601,7 +692,8 @@ class _IncidentReportSheet extends StatefulWidget {
   State<_IncidentReportSheet> createState() => _IncidentReportSheetState();
 }
 
-class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleTickerProviderStateMixin {
+class _IncidentReportSheetState extends State<_IncidentReportSheet>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   // AI Tab state
@@ -616,11 +708,16 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
   String _locationId = 'C01';
   String _fromLoc = 'C01';
   String _toLoc = 'C02';
-  final TextEditingController _incidentTimeController = TextEditingController(text: '11:30');
-  final TextEditingController _endTimeController = TextEditingController(text: '13:00');
-  final TextEditingController _weightController = TextEditingController(text: '50');
-  final TextEditingController _volumeController = TextEditingController(text: '0.4');
-  final TextEditingController _latestTimeController = TextEditingController(text: '14:00');
+  final TextEditingController _incidentTimeController =
+      TextEditingController(text: '11:30');
+  final TextEditingController _endTimeController =
+      TextEditingController(text: '13:00');
+  final TextEditingController _weightController =
+      TextEditingController(text: '50');
+  final TextEditingController _volumeController =
+      TextEditingController(text: '0.4');
+  final TextEditingController _latestTimeController =
+      TextEditingController(text: '14:00');
   bool _submitting = false;
 
   final List<String> _samplePrompts = [
@@ -671,7 +768,8 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
     if (_parsedPreview!['event_type'] == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_parsedPreview!['clarification'] ?? 'Could not identify incident type. Please try again or use the form tab.'),
+          content: Text(_parsedPreview!['clarification'] ??
+              'Could not identify incident type. Please try again or use the form tab.'),
           backgroundColor: AppTheme.rose,
         ),
       );
@@ -737,7 +835,7 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: AppTheme.emerald,
-            content: Text('Structured incident submitted to dispatcher!'),
+            content: Text('Incident submitted to dispatcher!'),
           ),
         );
         widget.onSuccess();
@@ -752,8 +850,9 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.88,
       decoration: const BoxDecoration(
         color: AppTheme.surfaceWhite,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -762,7 +861,7 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
         children: [
           // Drag handle
           Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            margin: const EdgeInsets.only(top: 10, bottom: 6),
             width: 36,
             height: 4,
             decoration: BoxDecoration(
@@ -770,23 +869,100 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          // Tab bar
-          Container(
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppTheme.border)),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: AppTheme.primary,
-              labelColor: AppTheme.primary,
-              unselectedLabelColor: AppTheme.textMuted,
-              indicatorWeight: 2.5,
-              tabs: const [
-                Tab(icon: Icon(Icons.auto_awesome, size: 17), text: 'AI Natural Language'),
-                Tab(icon: Icon(Icons.list_alt, size: 17), text: 'Structured Form'),
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.amberSoft,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.warning_amber_rounded,
+                      color: AppTheme.amber, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Report Disruption',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textMain,
+                        ),
+                      ),
+                      Text(
+                        'Use AI or fill the structured form',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded, color: AppTheme.textMuted),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.surfaceElevated,
+                  ),
+                ),
               ],
             ),
           ),
+          // Tab bar
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceElevated,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: AppTheme.surfaceWhite,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: AppTheme.shadowSm,
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerHeight: 0,
+              labelColor: AppTheme.primary,
+              unselectedLabelColor: AppTheme.textMuted,
+              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              unselectedLabelStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              tabs: const [
+                Tab(
+                  height: 38,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.auto_awesome, size: 15),
+                      SizedBox(width: 6),
+                      Text('AI Parser'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  height: 38,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.list_alt_rounded, size: 15),
+                      SizedBox(width: 6),
+                      Text('Form'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -796,6 +972,7 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
               ],
             ),
           ),
+          SizedBox(height: bottomInset > 0 ? 0 : 8),
         ],
       ),
     );
@@ -803,48 +980,66 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
 
   Widget _buildAiTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Describe the disruption in plain words:',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textMain),
+            'Describe what happened',
+            style: TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textMain),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _promptController,
             maxLines: 3,
             decoration: const InputDecoration(
-              hintText: 'e.g., My truck V02 has broken down near C04 at 11:30 AM...',
+              hintText: 'e.g., My truck V02 broke down near C04 at 11:30…',
             ),
           ),
           const SizedBox(height: 12),
           // Quick sample chips
           Wrap(
-            spacing: 8,
+            spacing: 6,
             runSpacing: 6,
             children: _samplePrompts.map((p) {
-              return ActionChip(
-                backgroundColor: AppTheme.surfaceElevated,
-                side: const BorderSide(color: AppTheme.border),
-                label: Text(
-                  p.length > 38 ? '${p.substring(0, 38)}...' : p,
-                  style: const TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+              return GestureDetector(
+                onTap: () => setState(() => _promptController.text = p),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceElevated,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Text(
+                    p.length > 40 ? '${p.substring(0, 40)}…' : p,
+                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                  ),
                 ),
-                onPressed: () => setState(() => _promptController.text = p),
               );
             }).toList(),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _isParsing ? null : _handleParse,
               icon: _isParsing
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
                   : const Icon(Icons.auto_awesome, size: 17),
-              label: Text(_isParsing ? 'Parsing with Gemini...' : 'Analyze with AI Parser'),
+              label:
+                  Text(_isParsing ? 'Analyzing…' : 'Analyze with AI'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
             ),
           ),
           if (_parseError != null) ...[
@@ -853,10 +1048,19 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppTheme.roseSoft,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AppTheme.rose.withValues(alpha: 0.3)),
               ),
-              child: Text(_parseError!, style: const TextStyle(color: AppTheme.rose, fontSize: 13)),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, size: 16, color: AppTheme.rose),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(_parseError!,
+                        style: const TextStyle(color: AppTheme.rose, fontSize: 12.5)),
+                  ),
+                ],
+              ),
             ),
           ],
           if (_parsedPreview != null) ...[
@@ -864,41 +1068,55 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceElevated,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.border),
+                color: AppTheme.emeraldSoft,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.emerald.withValues(alpha: 0.2)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'AI Extraction Preview:',
-                    style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.emerald, fontSize: 13.5),
+                  Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded,
+                          size: 16, color: AppTheme.emerald),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'AI Extraction',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.emerald,
+                            fontSize: 13),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text('Event: ${_parsedPreview!['event_type'] ?? "UNKNOWN"}',
-                      style: const TextStyle(fontSize: 13, color: AppTheme.textMain, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 10),
+                  _PreviewRow(
+                      'Event', _parsedPreview!['event_type']?.toString() ?? 'UNKNOWN'),
                   if (_parsedPreview!['vehicle_id'] != null)
-                    Text('Vehicle: ${_parsedPreview!['vehicle_id']}',
-                        style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                    _PreviewRow(
+                        'Vehicle', _parsedPreview!['vehicle_id'].toString()),
                   if (_parsedPreview!['location_id'] != null)
-                    Text('Location: ${_parsedPreview!['location_id']}',
-                        style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                    _PreviewRow(
+                        'Location', _parsedPreview!['location_id'].toString()),
                   if (_parsedPreview!['incident_time'] != null)
-                    Text('Time: ${_parsedPreview!['incident_time']}',
-                        style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                    _PreviewRow(
+                        'Time', _parsedPreview!['incident_time'].toString()),
                   if (_parsedPreview!['clarification'] != null) ...[
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: AppTheme.amberSoft,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppTheme.amber.withValues(alpha: 0.3)),
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: AppTheme.amber.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         _parsedPreview!['clarification'],
-                        style: const TextStyle(fontSize: 12, color: AppTheme.amber, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.amber,
+                            fontWeight: FontWeight.w500),
                       ),
                     ),
                   ],
@@ -908,8 +1126,14 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
                     child: ElevatedButton.icon(
                       onPressed: _submitting ? null : _submitAiParsed,
                       icon: const Icon(Icons.send_rounded, size: 16),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.emerald),
-                      label: Text(_submitting ? 'Submitting...' : 'Confirm & Send to Dispatcher'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.emerald,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      label: Text(
+                          _submitting ? 'Sending…' : 'Send to Dispatcher'),
                     ),
                   ),
                 ],
@@ -925,20 +1149,25 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
     final locIds = widget.locations.map((l) => l.id).toList();
     if (!locIds.contains(_locationId) && locIds.isNotEmpty) _locationId = locIds.first;
     if (!locIds.contains(_fromLoc) && locIds.isNotEmpty) _fromLoc = locIds.first;
-    if (!locIds.contains(_toLoc) && locIds.isNotEmpty) _toLoc = locIds.length > 1 ? locIds[1] : locIds.first;
+    if (!locIds.contains(_toLoc) && locIds.isNotEmpty) {
+      _toLoc = locIds.length > 1 ? locIds[1] : locIds.first;
+    }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           DropdownButtonFormField<String>(
             value: _eventType,
-            decoration: const InputDecoration(labelText: 'Disruption Event Type'),
+            decoration: const InputDecoration(labelText: 'Disruption Type'),
             items: const [
-              DropdownMenuItem(value: 'VEHICLE_FAILURE', child: Text('Vehicle Breakdown (VEHICLE_FAILURE)')),
-              DropdownMenuItem(value: 'ROAD_CLOSURE', child: Text('Road Closure (ROAD_CLOSURE)')),
-              DropdownMenuItem(value: 'URGENT_ORDER', child: Text('Urgent Order Request (URGENT_ORDER)')),
+              DropdownMenuItem(
+                  value: 'VEHICLE_FAILURE', child: Text('Vehicle Breakdown')),
+              DropdownMenuItem(
+                  value: 'ROAD_CLOSURE', child: Text('Road Closure')),
+              DropdownMenuItem(
+                  value: 'URGENT_ORDER', child: Text('Urgent Order')),
             ],
             onChanged: (v) => setState(() => _eventType = v!),
           ),
@@ -956,30 +1185,28 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
             DropdownButtonFormField<String>(
               value: _locationId,
               decoration: const InputDecoration(labelText: 'Breakdown Location'),
-              items: locIds.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+              items: locIds
+                  .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                  .toList(),
               onChanged: (v) => setState(() => _locationId = v!),
             ),
           ] else if (_eventType == 'ROAD_CLOSURE') ...[
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _fromLoc,
-                    decoration: const InputDecoration(labelText: 'From Junction/Location'),
-                    items: locIds.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
-                    onChanged: (v) => setState(() => _fromLoc = v!),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _toLoc,
-                    decoration: const InputDecoration(labelText: 'To Junction/Location'),
-                    items: locIds.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
-                    onChanged: (v) => setState(() => _toLoc = v!),
-                  ),
-                ),
-              ],
+            DropdownButtonFormField<String>(
+              value: _fromLoc,
+              decoration: const InputDecoration(labelText: 'From Location'),
+              items: locIds
+                  .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                  .toList(),
+              onChanged: (v) => setState(() => _fromLoc = v!),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              value: _toLoc,
+              decoration: const InputDecoration(labelText: 'To Location'),
+              items: locIds
+                  .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                  .toList(),
+              onChanged: (v) => setState(() => _toLoc = v!),
             ),
             const SizedBox(height: 14),
             TextField(
@@ -990,7 +1217,9 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
             DropdownButtonFormField<String>(
               value: _locationId,
               decoration: const InputDecoration(labelText: 'Delivery Destination'),
-              items: locIds.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+              items: locIds
+                  .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                  .toList(),
               onChanged: (v) => setState(() => _locationId = v!),
             ),
             const SizedBox(height: 14),
@@ -1016,7 +1245,8 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
             const SizedBox(height: 14),
             TextField(
               controller: _latestTimeController,
-              decoration: const InputDecoration(labelText: 'Latest Delivery Deadline (HH:MM)'),
+              decoration:
+                  const InputDecoration(labelText: 'Latest Delivery (HH:MM)'),
             ),
           ],
           const SizedBox(height: 14),
@@ -1030,8 +1260,42 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
             child: ElevatedButton.icon(
               onPressed: _submitting ? null : _submitForm,
               icon: const Icon(Icons.send_rounded, size: 16),
-              label: Text(_submitting ? 'Submitting...' : 'Submit to Dispatcher'),
+              label: Text(_submitting ? 'Submitting…' : 'Submit to Dispatcher'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Preview Row ─────────────────────────────────────────────────────────────
+class _PreviewRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _PreviewRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 70,
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w500)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(
+                    fontSize: 13, color: AppTheme.textMain, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
