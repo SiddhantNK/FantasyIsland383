@@ -33,6 +33,9 @@ class MemoryRepo:
         for o in orders:
             self._orders[o.id] = copy.deepcopy(o)
 
+    def delete_vehicle(self, vehicle_id):
+        self._vehicles.pop(vehicle_id, None)
+
     # --- disruptions
     def add_disruption(self, row):
         row = dict(row, id=next(self._did), created_at="now")

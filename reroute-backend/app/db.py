@@ -43,6 +43,9 @@ class SupabaseRepo:
         if rows:
             self._t("vehicles").upsert(rows).execute()
 
+    def delete_vehicle(self, vehicle_id):
+        self._t("vehicles").delete().eq("id", vehicle_id).execute()
+
     def save_orders(self, orders):
         rows = [{"id": o.id, "location_id": o.location_id, "weight_kg": o.weight,
                  "volume_m3": o.volume, "earliest": to_time(o.earliest),

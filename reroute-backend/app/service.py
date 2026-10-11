@@ -40,7 +40,8 @@ def _stop_json(s, o=None):
          "status": s.status, "reason": s.reason}
     if o:
         d.update(weight_kg=o.weight, volume_m3=o.volume,
-                 window=f"{hhmm(o.earliest)}-{hhmm(o.latest)}")
+                 window=f"{hhmm(o.earliest)}-{hhmm(o.latest)}",
+                 priority=o.priority)
     return d
 
 

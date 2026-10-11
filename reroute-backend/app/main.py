@@ -64,6 +64,12 @@ class IncidentIn(BaseModel):
     order: Optional[dict] = None          # urgent order payload
 
 
+class VehicleIn(BaseModel):
+    id: str
+    weight_cap_kg: float
+    volume_cap_m3: float
+
+
 class ParseIn(BaseModel):
     text: str
 
@@ -88,6 +94,62 @@ def health():
 @app.get("/state")
 def state():
     return service.get_state(repo)
+
+
+# ---- vehicles
+@app.get("/vehicles")
+def vehicles_list():
+    return [{"id": v.id, "weight_cap_kg": v.weight_cap, "volume_cap_m3": v.volume_cap,
+             "status": "FAILED" if v.failed else "ACTIVE",
+             "failed_at": v.failed_at, "failed_location": v.failed_location}
+            for v in repo.vehicles()]
+
+
+@app.post("/vehicles")
+def vehicles_add(body: VehicleIn):
+    vid = body.id.strip().upper()
+    if not vid:
+        raise HTTPException(400, "Vehicle ID is required.")
+    existing = {v.id for v in repo.vehicles()}
+    if vid in existing:
+        raise HTTPException(409, f"Vehicle {vid} already exists.")
+    if body.weight_cap_kg <= 0 or body.volume_cap_m3 <= 0:
+        raise HTTPException(400, "Capacity values must be positive.")
+    from .models import Vehicle
+    v = Vehicle(id=vid, weight_cap=body.weight_cap_kg, volume_cap=body.volume_cap_m3)
+    repo.save_vehicles([v])
+    return {"id": v.id, "weight_cap_kg": v.weight_cap, "volume_cap_m3": v.volume_cap,
+            "status": "ACTIVE"}
+
+
+@app.patch("/vehicles/{vehicle_id}")
+def vehicles_update(vehicle_id: str, body: VehicleIn):
+    vmap = {v.id: v for v in repo.vehicles()}
+    if vehicle_id not in vmap:
+        raise HTTPException(404, f"Vehicle {vehicle_id} not found.")
+    v = vmap[vehicle_id]
+    if body.weight_cap_kg > 0:
+        v.weight_cap = body.weight_cap_kg
+    if body.volume_cap_m3 > 0:
+        v.volume_cap = body.volume_cap_m3
+    repo.save_vehicles([v])
+    return {"id": v.id, "weight_cap_kg": v.weight_cap, "volume_cap_m3": v.volume_cap,
+            "status": "FAILED" if v.failed else "ACTIVE"}
+
+
+@app.delete("/vehicles/{vehicle_id}")
+def vehicles_delete(vehicle_id: str):
+    vmap = {v.id: v for v in repo.vehicles()}
+    if vehicle_id not in vmap:
+        raise HTTPException(404, f"Vehicle {vehicle_id} not found.")
+    plan = repo.latest_plan()
+    if plan:
+        active_stops = [s for s in plan.route(vehicle_id) if s.status not in ("COMPLETED", "BROKEN")]
+        if active_stops:
+            raise HTTPException(409, f"Vehicle {vehicle_id} has {len(active_stops)} active stops. "
+                                     "Reset or complete the plan first.")
+    repo.delete_vehicle(vehicle_id)
+    return {"ok": True, "deleted": vehicle_id}
 
 
 # ---- plans

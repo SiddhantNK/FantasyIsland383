@@ -14,6 +14,7 @@ from .travel import tt
 
 HORIZON = 2880          # minutes the time dimension may span
 BASE_PENALTY = 1_000_000  # cost of dropping a priority-1 order
+PRIORITY_LABELS = {1: "Standard", 2: "High", 3: "Critical"}
 
 
 @dataclass
@@ -51,11 +52,13 @@ def _fits(vehicle: Vehicle, seq) -> bool:
 
 # ------------------------------------------------------------- explanations
 def explain_unassigned(order: Order, states, travel, not_before=0) -> str:
+    plabel = PRIORITY_LABELS.get(order.priority, f"P{order.priority}")
+    prefix = f"[{plabel} priority] " if order.priority > 1 else ""
     if not states:
-        return "No available vehicle: all vehicles have failed or none exist."
+        return f"{prefix}No available vehicle: all vehicles have failed or none exist."
     lo = max(order.earliest, not_before)
     if lo > order.latest:
-        return (f"Time window closed: latest delivery {hhmm(order.latest)} is "
+        return (f"{prefix}Time window closed: latest delivery {hhmm(order.latest)} is "
                 f"before the earliest feasible service time {hhmm(lo)}.")
     capable = [s for s in states
                if order.weight <= s.vehicle.weight_cap + 1e-9
@@ -63,15 +66,15 @@ def explain_unassigned(order: Order, states, travel, not_before=0) -> str:
     if not capable:
         mw = max(s.vehicle.weight_cap for s in states)
         mv = max(s.vehicle.volume_cap for s in states)
-        return (f"Insufficient vehicle capacity: order needs {order.weight:g} kg / "
+        return (f"{prefix}Insufficient vehicle capacity: order needs {order.weight:g} kg / "
                 f"{order.volume:g} m3, largest available vehicle holds "
                 f"{mw:g} kg / {mv:g} m3.")
     earliest = min(max(s.start_time + tt(travel, s.start_loc, order.location_id), lo)
                    for s in capable)
     if earliest > order.latest:
-        return (f"Time window infeasible: earliest possible arrival "
+        return (f"{prefix}Time window infeasible: earliest possible arrival "
                 f"{hhmm(earliest)} is after the latest allowed {hhmm(order.latest)}.")
-    return ("No feasible slot: remaining capacity and the time windows of other "
+    return (f"{prefix}No feasible slot: remaining capacity and the time windows of other "
             "assigned orders leave no room for this order.")
 
 
@@ -134,8 +137,10 @@ def _route_ortools(states, orders, travel, not_before, time_limit_s):
         dem(vol), 0, [_down(s.vehicle.volume_cap) for s in states], True, "Volume")
 
     for i, o in enumerate(orders):  # orders may be dropped, at a price
+        # Quadratic scaling: P1=1M, P2=4M, P3=9M — makes dropping high-priority orders
+        # very expensive relative to standard ones
         routing.AddDisjunction([manager.NodeToIndex(i)],
-                               BASE_PENALTY * max(1, o.priority))
+                               BASE_PENALTY * max(1, o.priority) ** 2)
 
     params = pywrapcp.DefaultRoutingSearchParameters()
     params.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC

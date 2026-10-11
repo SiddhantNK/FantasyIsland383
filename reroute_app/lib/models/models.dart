@@ -123,6 +123,7 @@ class StopModel {
   final double? weightKg;
   final double? volumeM3;
   final String? window;
+  final int priority; // 1=Standard, 2=High, 3=Critical
 
   StopModel({
     this.vehicleId,
@@ -137,9 +138,20 @@ class StopModel {
     this.weightKg,
     this.volumeM3,
     this.window,
+    this.priority = 1,
   });
 
   bool get isUnassigned => vehicleId == null;
+  bool get isCritical => priority >= 3;
+  bool get isHighPriority => priority >= 2;
+
+  String get priorityLabel {
+    switch (priority) {
+      case 3: return 'Critical';
+      case 2: return 'High';
+      default: return 'Standard';
+    }
+  }
 
   factory StopModel.fromJson(Map<String, dynamic> json) {
     return StopModel(
@@ -155,6 +167,7 @@ class StopModel {
       weightKg: (json['weight_kg'] as num?)?.toDouble(),
       volumeM3: (json['volume_m3'] as num?)?.toDouble(),
       window: json['window'],
+      priority: json['priority'] ?? 1,
     );
   }
 }
@@ -272,13 +285,16 @@ class PlanComparisonModel {
 
   factory PlanComparisonModel.fromJson(Map<String, dynamic> json) {
     return PlanComparisonModel(
-      planId: json['plan_id'] ?? 0,
-      parentPlanId: json['parent_plan_id'] ?? 0,
+      planId: json['new_plan_id'] ?? json['plan_id'] ?? 0,
+      parentPlanId: json['old_plan_id'] ?? json['parent_plan_id'] ?? 0,
       counts: (json['counts'] as Map<String, dynamic>?)?.map(
             (k, v) => MapEntry(k, (v as num).toInt()),
           ) ??
           {},
-      changes: (json['changes'] as List<dynamic>?)
+      changes: (json['orders'] as List<dynamic>?)
+              ?.map((c) => c as Map<String, dynamic>)
+              .toList() ??
+          (json['changes'] as List<dynamic>?)
               ?.map((c) => c as Map<String, dynamic>)
               .toList() ??
           [],
