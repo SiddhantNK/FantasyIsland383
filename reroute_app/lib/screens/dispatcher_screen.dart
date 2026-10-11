@@ -93,8 +93,13 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
       widget.onRefresh();
     } catch (e) {
       if (mounted) {
+        final msg = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(backgroundColor: AppTheme.rose, content: Text('Confirm failed: $e')),
+          SnackBar(
+            backgroundColor: AppTheme.rose,
+            content: Text('Cannot Confirm: $msg'),
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     } finally {

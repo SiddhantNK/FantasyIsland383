@@ -50,7 +50,7 @@ class RouteMapWidget extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceDark.withOpacity(0.9),
+                  color: AppTheme.surfaceDark.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: AppTheme.border),
                 ),
@@ -63,7 +63,7 @@ class RouteMapWidget extends StatelessWidget {
                     const SizedBox(width: 12),
                     _legendItem(AppTheme.purple, 'V03'),
                     const SizedBox(width: 12),
-                    _legendItem(AppTheme.rose, 'Closure / Broken'),
+                    _legendItem(AppTheme.rose, 'Closure / Alert'),
                   ],
                 ),
               ),
@@ -100,7 +100,7 @@ class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppTheme.border.withOpacity(0.25)
+      ..color = AppTheme.border.withValues(alpha: 0.25)
       ..strokeWidth = 1;
 
     const step = 32.0;
@@ -121,6 +121,20 @@ class NetworkPainter extends CustomPainter {
   final List<LocationModel> locations;
   final String? highlightedVehicleId;
   final List<DisruptionModel> activeClosures;
+
+  static const Map<String, List<double>> fallbackCoords = {
+    'DEPOT': [0.0, 0.0],
+    'C01': [4.0, 3.0],
+    'C02': [7.0, 1.0],
+    'C03': [9.0, 5.0],
+    'C04': [3.0, 8.0],
+    'C05': [-3.0, 6.0],
+    'C06': [-6.0, 2.0],
+    'C07': [-4.0, -4.0],
+    'C08': [2.0, -6.0],
+    'C09': [8.0, -3.0],
+    'C10': [-8.0, -6.0],
+  };
 
   NetworkPainter({
     required this.plan,
@@ -143,16 +157,29 @@ class NetworkPainter extends CustomPainter {
   }
 
   Offset _toScreen(double lat, double lng, Size size) {
-    // Coordinate mapping: lat roughly -10 to +10, lng roughly -10 to +10
-    // Center is (0, 0)
     final cx = size.width / 2;
     final cy = size.height / 2;
     final scale = (size.width < size.height ? size.width : size.height) / 24.0;
 
     return Offset(
       cx + (lng * scale),
-      cy - (lat * scale), // invert y for standard cartesian
+      cy - (lat * scale),
     );
+  }
+
+  Offset? _getOffset(Map<String, LocationModel> locMap, String id, Size size) {
+    final loc = locMap[id];
+    double? lat = loc?.lat;
+    double? lng = loc?.lng;
+    if (lat == null || lng == null) {
+      final fb = fallbackCoords[id];
+      if (fb != null) {
+        lat = fb[0];
+        lng = fb[1];
+      }
+    }
+    if (lat == null || lng == null) return null;
+    return _toScreen(lat, lng, size);
   }
 
   @override
@@ -162,14 +189,12 @@ class NetworkPainter extends CustomPainter {
     // Draw active road closures first (dashed/bold red line)
     for (var c in activeClosures) {
       if (c.fromLocation != null && c.toLocation != null) {
-        final f = locMap[c.fromLocation!];
-        final t = locMap[c.toLocation!];
-        if (f != null && t != null && f.lat != null && t.lat != null) {
-          final p1 = _toScreen(f.lat!, f.lng!, size);
-          final p2 = _toScreen(t.lat!, t.lng!, size);
+        final p1 = _getOffset(locMap, c.fromLocation!, size);
+        final p2 = _getOffset(locMap, c.toLocation!, size);
+        if (p1 != null && p2 != null) {
           final paint = Paint()
-            ..color = AppTheme.rose.withOpacity(0.8)
-            ..strokeWidth = 4
+            ..color = AppTheme.rose.withValues(alpha: 0.85)
+            ..strokeWidth = 4.5
             ..strokeCap = StrokeCap.round;
           canvas.drawLine(p1, p2, paint);
         }
@@ -178,10 +203,7 @@ class NetworkPainter extends CustomPainter {
 
     // Draw vehicle routes
     if (plan != null) {
-      final depot = locMap['DEPOT'];
-      final depotOffset = depot != null && depot.lat != null
-          ? _toScreen(depot.lat!, depot.lng!, size)
-          : Offset(size.width / 2, size.height / 2);
+      final depotOffset = _getOffset(locMap, 'DEPOT', size) ?? Offset(size.width / 2, size.height / 2);
 
       for (var v in plan!.vehicles) {
         if (highlightedVehicleId != null && v.id != highlightedVehicleId) {
@@ -190,8 +212,8 @@ class NetworkPainter extends CustomPainter {
 
         final color = _vehicleColor(v.id);
         final linePaint = Paint()
-          ..color = v.isFailed ? AppTheme.textDim.withOpacity(0.3) : color.withOpacity(0.7)
-          ..strokeWidth = 2.5
+          ..color = v.isFailed ? AppTheme.textDim.withValues(alpha: 0.3) : color.withValues(alpha: 0.85)
+          ..strokeWidth = 3.0
           ..style = PaintingStyle.stroke
           ..strokeJoin = StrokeJoin.round;
 
@@ -200,9 +222,8 @@ class NetworkPainter extends CustomPainter {
 
         final sortedStops = List<StopModel>.from(v.stops)..sort((a, b) => a.seq.compareTo(b.seq));
         for (var stop in sortedStops) {
-          final loc = locMap[stop.locationId];
-          if (loc != null && loc.lat != null && loc.lng != null) {
-            final pt = _toScreen(loc.lat!, loc.lng!, size);
+          final pt = _getOffset(locMap, stop.locationId, size);
+          if (pt != null) {
             path.lineTo(pt.dx, pt.dy);
           }
         }
@@ -211,11 +232,13 @@ class NetworkPainter extends CustomPainter {
       }
     }
 
-    // Draw location nodes
-    for (var loc in locations) {
-      if (loc.lat == null || loc.lng == null) continue;
-      final pt = _toScreen(loc.lat!, loc.lng!, size);
-      final isDepot = loc.id == 'DEPOT';
+    // Determine all node IDs to draw (locations or fallback keys)
+    final nodeIds = locations.isNotEmpty ? locations.map((l) => l.id).toSet() : fallbackCoords.keys.toSet();
+
+    for (var id in nodeIds) {
+      final pt = _getOffset(locMap, id, size);
+      if (pt == null) continue;
+      final isDepot = id == 'DEPOT';
 
       final nodePaint = Paint()
         ..color = isDepot ? AppTheme.amber : AppTheme.surfaceDark
@@ -229,19 +252,19 @@ class NetworkPainter extends CustomPainter {
       // Glow effect for depot
       if (isDepot) {
         final glowPaint = Paint()
-          ..color = AppTheme.amber.withOpacity(0.3)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-        canvas.drawCircle(pt, 14, glowPaint);
+          ..color = AppTheme.amber.withValues(alpha: 0.35)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+        canvas.drawCircle(pt, 16, glowPaint);
       }
 
-      final radius = isDepot ? 9.0 : 6.0;
+      final radius = isDepot ? 10.0 : 7.0;
       canvas.drawCircle(pt, radius, nodePaint);
       canvas.drawCircle(pt, radius, borderPaint);
 
       // Label
       final tp = TextPainter(
         text: TextSpan(
-          text: loc.id,
+          text: id,
           style: TextStyle(
             color: isDepot ? AppTheme.amberLight : AppTheme.textMuted,
             fontSize: isDepot ? 11 : 9,
@@ -251,7 +274,7 @@ class NetworkPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      tp.paint(canvas, Offset(pt.dx - tp.width / 2, pt.dy + radius + 3));
+      tp.paint(canvas, Offset(pt.dx - tp.width / 2, pt.dy + radius + 4));
     }
   }
 

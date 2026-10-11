@@ -117,7 +117,11 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
     final err = jsonDecode(response.body);
-    throw Exception(err['detail'] ?? err['errors']?.toString() ?? 'Failed to confirm incident');
+    final errorsList = err['errors'];
+    final errorMsg = errorsList is List && errorsList.isNotEmpty
+        ? errorsList.join("; ")
+        : (err['detail'] ?? 'Failed to confirm incident');
+    throw Exception(errorMsg);
   }
 
   static Future<DisruptionModel> rejectIncident(int id) async {

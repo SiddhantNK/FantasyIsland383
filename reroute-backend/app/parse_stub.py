@@ -109,7 +109,14 @@ def parse_incident(text: str, vehicle_ids, location_ids) -> dict:
         raw = _call_gemini(text, list(vehicle_ids), list(location_ids))
     except NotImplementedError:
         raise
-    except Exception:  # network error, quota, malformed JSON ...
+    except Exception as e:
+        msg = str(e)
+        if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+            clarify = "Gemini API Quota Exceeded (429). Your Google Gemini API key has run out of tokens/requests."
+        elif "404" in msg:
+            clarify = f"Gemini Model not found ({MODEL}). Please set GEMINI_MODEL=gemini-2.0-flash or gemini-1.5-flash."
+        else:
+            clarify = f"AI parser error: {msg[:120]}. Please use the structured form."
         return {"event_type": None, "missing": ["event_type"],
-                "clarification": "I couldn't read that report. Please try again or use the form."}
+                "clarification": clarify}
     return normalize(raw)
