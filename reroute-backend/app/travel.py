@@ -39,3 +39,14 @@ def apply_closure(travel: dict, a: str, b: str, extra_min: int) -> dict:
         if pair in new:
             new[pair] += extra_min
     return shortest_paths(new)
+
+
+def apply_closures(travel: dict, closures) -> dict:
+    """closures: iterable of (a, b, extra_min). Extras on the same road add up;
+    shortest paths are recomputed once at the end."""
+    new = dict(travel)
+    for a, b, extra in closures:
+        for pair in ((a, b), (b, a)):
+            if pair in new:
+                new[pair] += extra
+    return shortest_paths(new)

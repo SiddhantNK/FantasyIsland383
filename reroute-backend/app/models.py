@@ -24,6 +24,11 @@ def to_min(value) -> Optional[int]:
     return int(parts[0]) * 60 + int(parts[1])
 
 
+def to_time(minutes: Optional[int]) -> Optional[str]:
+    """690 -> '11:30:00' (Postgres `time` format)."""
+    return None if minutes is None else f"{hhmm(minutes)}:00"
+
+
 def hhmm(minutes: Optional[int]) -> str:
     if minutes is None:
         return "--:--"
@@ -74,6 +79,10 @@ class Stop:
 class Plan:
     stops: list = field(default_factory=list)
     version: int = 1
+    id: Optional[int] = None
+    parent_plan_id: Optional[int] = None
+    disruption_id: Optional[int] = None
+    feasible: bool = True
 
     def route(self, vehicle_id: str) -> list:
         return sorted((s for s in self.stops if s.vehicle_id == vehicle_id),
