@@ -183,23 +183,55 @@ class _HomeScreenState extends State<HomeScreen> {
               user?.name ?? 'User',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textMain),
             ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceElevated,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: AppTheme.border),
+            if (user?.email.isNotEmpty == true) ...[
+              const SizedBox(height: 2),
+              Text(
+                user!.email,
+                style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
               ),
-              child: Text(
-                user?.roleLabel.toUpperCase() ?? 'GUEST',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textMuted,
-                  letterSpacing: 0.5,
+            ],
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceElevated,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Text(
+                    user?.roleLabel.toUpperCase() ?? 'GUEST',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textMuted,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
-              ),
+                if (user?.isDriver == true && user?.vehicleId != null) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primarySoft,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      'VEHICLE: ${user!.vehicleId}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 24),
             _MenuOption(
