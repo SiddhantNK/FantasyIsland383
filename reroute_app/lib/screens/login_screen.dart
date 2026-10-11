@@ -24,11 +24,9 @@ class _LoginScreenState extends State<LoginScreen>
   final _signUpNameController = TextEditingController();
   final _signUpEmailController = TextEditingController();
   final _signUpPasswordController = TextEditingController();
+  final _signUpConfirmPasswordController = TextEditingController();
   bool _signUpObscure = true;
-
-  // Sign Up role selections
-  UserRole _selectedRole = UserRole.driver;
-  String _selectedVehicle = 'V01';
+  bool _signUpConfirmObscure = true;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -47,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen>
     _signUpNameController.dispose();
     _signUpEmailController.dispose();
     _signUpPasswordController.dispose();
+    _signUpConfirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -59,6 +58,27 @@ class _LoginScreenState extends State<LoginScreen>
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  /// Strong password verification rules:
+  /// - Min 8 characters
+  /// - At least 1 uppercase letter
+  /// - At least 1 lowercase letter
+  /// - At least 1 number or special character
+  String? _validatePassword(String password) {
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters long.';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(password)) {
+      return 'Password must contain at least one uppercase letter (A-Z).';
+    }
+    if (!RegExp(r'[a-z]').hasMatch(password)) {
+      return 'Password must contain at least one lowercase letter (a-z).';
+    }
+    if (!RegExp(r'[0-9!@#\$&*~]').hasMatch(password)) {
+      return 'Password must contain at least one number or symbol.';
+    }
+    return null;
   }
 
   Future<void> _handleSignIn() async {
@@ -91,14 +111,21 @@ class _LoginScreenState extends State<LoginScreen>
     final name = _signUpNameController.text.trim();
     final email = _signUpEmailController.text.trim();
     final password = _signUpPasswordController.text;
+    final confirmPassword = _signUpConfirmPasswordController.text;
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
-      _showError('Please fill in all registration fields.');
+    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+      _showError('Please fill in all fields.');
       return;
     }
 
-    if (password.length < 6) {
-      _showError('Password must be at least 6 characters.');
+    if (password != confirmPassword) {
+      _showError('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    final passError = _validatePassword(password);
+    if (passError != null) {
+      _showError(passError);
       return;
     }
 
@@ -112,14 +139,11 @@ class _LoginScreenState extends State<LoginScreen>
         email: email,
         password: password,
         fullName: name,
-        role: _selectedRole,
-        vehicleId: _selectedRole == UserRole.driver ? _selectedVehicle : null,
       );
 
       if (res.session != null) {
         widget.onLoginSuccess();
       } else {
-        // Confirmation email might be required
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -140,15 +164,6 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  void _loginQuickDemo(UserRole role, [String vehicle = 'V01']) {
-    if (role == UserRole.driver) {
-      AuthService.demoLoginAsDriver(vehicleId: vehicle);
-    } else {
-      AuthService.demoLoginAsDispatcher();
-    }
-    widget.onLoginSuccess();
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.of(context).size.width;
@@ -165,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen>
               vertical: 24,
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 460),
+              constraints: const BoxConstraints(maxWidth: 440),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -254,7 +269,7 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ),
 
-                        // Error Banner if present
+                        // Error Banner
                         if (_errorMessage != null)
                           Container(
                             margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -294,73 +309,21 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                   ),
 
-                  const SizedBox(height: 20),
-
-                  // ── Quick Demo Mode Expandable / Card ───────────────
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceWhite,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.bolt_rounded, size: 18, color: Colors.amber.shade700),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'Instant Demo Bypass',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _isLoading ? null : () => _loginQuickDemo(UserRole.driver, 'V01'),
-                                icon: const Icon(Icons.local_shipping_rounded, size: 16),
-                                label: const Text('Driver V01'),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _isLoading ? null : () => _loginQuickDemo(UserRole.dispatcher),
-                                icon: const Icon(Icons.dashboard_rounded, size: 16),
-                                label: const Text('Dispatcher'),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
                   const SizedBox(height: 24),
-                  Text(
-                    'ReRoute · Powered by Supabase Auth',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: AppTheme.textDim.withValues(alpha: 0.7),
-                      letterSpacing: 0.3,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.shield_outlined, size: 14, color: AppTheme.textDim),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Secured by Supabase Authentication',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppTheme.textDim.withValues(alpha: 0.7),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -425,7 +388,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Sign Up Form ───────────────────────────────────────────────────────────
+  // ─── Sign Up Form (Strict Auth Verification, No direct bypass) ───────────────
   Widget _buildSignUpForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -452,6 +415,8 @@ class _LoginScreenState extends State<LoginScreen>
           obscureText: _signUpObscure,
           decoration: InputDecoration(
             labelText: 'Password',
+            helperText: 'Min 8 chars, 1 uppercase, 1 lowercase & 1 number',
+            helperMaxLines: 2,
             prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
             suffixIcon: IconButton(
               icon: Icon(
@@ -462,81 +427,22 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ),
-        const SizedBox(height: 18),
-
-        // Role Choice
-        const Text(
-          'Select Role',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _RoleSelectCard(
-                icon: Icons.local_shipping_rounded,
-                label: 'Driver',
-                selected: _selectedRole == UserRole.driver,
-                onTap: () => setState(() => _selectedRole = UserRole.driver),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _signUpConfirmPasswordController,
+          obscureText: _signUpConfirmObscure,
+          decoration: InputDecoration(
+            labelText: 'Confirm Password',
+            prefixIcon: const Icon(Icons.check_circle_outline_rounded, size: 20),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _signUpConfirmObscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                size: 20,
               ),
+              onPressed: () => setState(() => _signUpConfirmObscure = !_signUpConfirmObscure),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _RoleSelectCard(
-                icon: Icons.dashboard_rounded,
-                label: 'Dispatcher',
-                selected: _selectedRole == UserRole.dispatcher,
-                onTap: () => setState(() => _selectedRole = UserRole.dispatcher),
-              ),
-            ),
-          ],
+          ),
         ),
-
-        // Assigned Vehicle for Drivers
-        if (_selectedRole == UserRole.driver) ...[
-          const SizedBox(height: 16),
-          const Text(
-            'Assigned Vehicle',
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: ['V01', 'V02', 'V03'].map((v) {
-              final isSel = _selectedVehicle == v;
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: v != 'V03' ? 8 : 0),
-                  child: InkWell(
-                    onTap: () => setState(() => _selectedVehicle = v),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSel ? AppTheme.primarySoft : AppTheme.surfaceElevated,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isSel ? AppTheme.primary : AppTheme.border,
-                          width: isSel ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          v,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: isSel ? AppTheme.primary : AppTheme.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-
         const SizedBox(height: 22),
         SizedBox(
           height: 48,
@@ -553,64 +459,12 @@ class _LoginScreenState extends State<LoginScreen>
                     children: [
                       Icon(Icons.person_add_rounded, size: 18),
                       SizedBox(width: 8),
-                      Text('Create Account', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                      Text('Verify & Create Account', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                     ],
                   ),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _RoleSelectCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _RoleSelectCard({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? AppTheme.primarySoft : AppTheme.surfaceElevated,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? AppTheme.primary : AppTheme.border,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: selected ? AppTheme.primary : AppTheme.textMuted,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: selected ? AppTheme.primary : AppTheme.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

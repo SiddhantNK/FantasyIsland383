@@ -56,7 +56,6 @@ class AuthService {
       );
       return _currentUser;
     } catch (e) {
-      // Fallback if profiles table is not yet created or unreachable
       final metadata = user.userMetadata ?? {};
       final roleStr = (metadata['role'] ?? 'driver').toString().toLowerCase();
       final role = roleStr == 'dispatcher' ? UserRole.dispatcher : UserRole.driver;
@@ -85,44 +84,36 @@ class AuthService {
     return false;
   }
 
-  /// Sign Up with Email, Password and Role
+  /// Sign Up with Email & Password.
+  /// New sign-ups are defaulted safely in the database; role assignment is controlled via DB/profiles.
   static Future<AuthResponse> signUp({
     required String email,
     required String password,
     required String fullName,
-    required UserRole role,
-    String? vehicleId,
   }) async {
     final response = await _client.auth.signUp(
       email: email.trim(),
       password: password,
       data: {
         'full_name': fullName.trim(),
-        'role': role.name,
-        'vehicle_id': role == UserRole.driver ? (vehicleId ?? 'V01') : null,
       },
     );
 
     if (response.user != null) {
-      // Upsert profile in case database trigger hasn't completed or is missing
       try {
         await _client.from('profiles').upsert({
           'id': response.user!.id,
           'email': response.user!.email,
           'full_name': fullName.trim(),
-          'role': role.name,
-          'vehicle_id': role == UserRole.driver ? (vehicleId ?? 'V01') : null,
         });
-      } catch (_) {
-        // Silently continue if table trigger already handled it or RLS prevented
-      }
+      } catch (_) {}
 
       await _fetchProfile(response.user!);
     }
     return response;
   }
 
-  /// Sign In with Email & Password
+  /// Sign In with Email & Password (verified credentials)
   static Future<AuthResponse> signIn({
     required String email,
     required String password,
@@ -144,25 +135,5 @@ class AuthService {
       await _client.auth.signOut();
     } catch (_) {}
     _currentUser = null;
-  }
-
-  /// Quick Demo Sign-in for immediate testing
-  static void demoLoginAsDriver({String vehicleId = 'V01'}) {
-    _currentUser = AuthUser(
-      id: 'demo-driver-id',
-      email: 'driver@reroute.demo',
-      name: 'Demo Driver ($vehicleId)',
-      role: UserRole.driver,
-      vehicleId: vehicleId,
-    );
-  }
-
-  static void demoLoginAsDispatcher() {
-    _currentUser = AuthUser(
-      id: 'demo-dispatcher-id',
-      email: 'dispatcher@reroute.demo',
-      name: 'Fleet Dispatcher',
-      role: UserRole.dispatcher,
-    );
   }
 }
