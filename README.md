@@ -2,6 +2,10 @@
 ## Team FantasyIsland383
 
 This is the official github repository of the project built for the hackathon
+# ReRoute
+
+The Flutter app is in `reroute_app/`. See [`reroute_app/README.md`](reroute_app/README.md) for Supabase email/password authentication setup and run instructions.
+
 # ReRoute backend
 
 ## Setup
