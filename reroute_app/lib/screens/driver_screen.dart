@@ -589,7 +589,14 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
     try {
       final res = await ApiService.parseIncident(text);
       setState(() {
-        _parsedPreview = res;
+        // Backend returns {"parsed": {...}, "errors": [...], "missing": [...], "clarification": ...}
+        final parsedData = (res['parsed'] is Map<String, dynamic>)
+            ? Map<String, dynamic>.from(res['parsed'])
+            : res;
+        if (res['clarification'] != null) {
+          parsedData['clarification'] = res['clarification'];
+        }
+        _parsedPreview = parsedData;
         _isParsing = false;
       });
     } catch (e) {
@@ -602,6 +609,15 @@ class _IncidentReportSheetState extends State<_IncidentReportSheet> with SingleT
 
   Future<void> _submitAiParsed() async {
     if (_parsedPreview == null) return;
+    if (_parsedPreview!['event_type'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_parsedPreview!['clarification'] ?? 'Could not identify incident type. Please try again or use the form tab.'),
+          backgroundColor: AppTheme.rose,
+        ),
+      );
+      return;
+    }
     setState(() => _submitting = true);
     try {
       final payload = Map<String, dynamic>.from(_parsedPreview!);

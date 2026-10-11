@@ -15,7 +15,18 @@ import os
 import re
 import time
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
+    from google import genai
+except ImportError:
+    genai = None
+
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 EVENTS = {"VEHICLE_FAILURE", "ROAD_CLOSURE", "URGENT_ORDER"}
 REQUIRED = {  # fields the driver must supply (checked on the flat extraction)
     "VEHICLE_FAILURE": ["vehicle_id", "location_id", "incident_time"],
@@ -72,32 +83,47 @@ def _call_gemini(text, vehicle_ids, location_ids) -> dict:
     key = os.getenv("GEMINI_API_KEY")
     if not key:
         raise NotImplementedError("GEMINI_API_KEY is not set")
-    from google import genai
-    from google.genai import types
+    if genai is None:
+        raise RuntimeError("google-genai package is not available. Run: pip install google-genai")
     if _client is None:
         _client = genai.Client(api_key=key)
     prompt = (PROMPT.replace("<VEHICLES>", ", ".join(vehicle_ids))
                     .replace("<LOCATIONS>", ", ".join(location_ids)) + text)
 
+    models_to_try = [
+        os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+        "gemini-3.8-flash",
+        "gemini-2.5-flash",
+        "gemini-1.5-flash",
+    ]
+    # Remove duplicates preserving order
+    seen_models = set()
+    models = [m for m in models_to_try if not (m in seen_models or seen_models.add(m))]
+
     last_error = None
-    for attempt in range(MAX_RETRIES):
-        try:
-            r = _client.models.generate_content(
-                model=MODEL, contents=prompt,
-                config=types.GenerateContentConfig(temperature=0,
-                                                   response_mime_type="application/json"))
-            data = json.loads(r.text)
-            return data if isinstance(data, dict) else {}
-        except Exception as e:
-            last_error = e
-            msg = str(e)
-            # Only retry on transient errors (rate limit, server error)
-            if "429" in msg or "500" in msg or "503" in msg or "RESOURCE_EXHAUSTED" in msg:
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(1.5 * (attempt + 1))
-                    continue
-            raise  # Non-transient errors don't retry
-    raise last_error
+    for target_model in models:
+        for attempt in range(MAX_RETRIES):
+            try:
+                r = _client.models.generate_content(
+                    model=target_model, contents=prompt,
+                    config={"temperature": 0, "response_mime_type": "application/json"})
+                data = json.loads(r.text)
+                return data if isinstance(data, dict) else {}
+            except Exception as e:
+                last_error = e
+                msg = str(e)
+                # If model is not found / obsolete, break to try next model immediately
+                if "404" in msg or "not found" in msg.lower() or "no longer available" in msg.lower():
+                    break
+                # Only retry on transient errors (rate limit, server error)
+                if "429" in msg or "500" in msg or "503" in msg or "RESOURCE_EXHAUSTED" in msg:
+                    if attempt < MAX_RETRIES - 1:
+                        time.sleep(1.5 * (attempt + 1))
+                        continue
+                raise
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Failed to generate content with Gemini")
 
 
 def _infer_event_from_text(text: str) -> str | None:
