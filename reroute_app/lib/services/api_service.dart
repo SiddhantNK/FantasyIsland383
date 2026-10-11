@@ -4,7 +4,7 @@ import '../models/models.dart';
 
 class ApiService {
   // Default to localhost, configurable via UI settings if running on emulator / remote
-  static String baseUrl = 'http://127.0.0.1:8000';
+  static String baseUrl = 'http://192.168';
 
   static Map<String, String> get _headers => {
         'Content-Type': 'application/json',
