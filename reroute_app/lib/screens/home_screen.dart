@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import 'dispatcher_screen.dart';
 import 'driver_screen.dart';
 import 'history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final AuthSession session;
+
+  const HomeScreen({super.key, required this.session});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -24,6 +27,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.session.isDispatcher) {
+      _currentTabIndex = 1;
+    }
     _refreshData();
   }
 
@@ -162,12 +168,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Center(
+              child: Text(
+                widget.session.user?.name ?? '',
+                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
+            ),
+          ),
           IconButton(
             tooltip: 'Refresh All',
             icon: const Icon(Icons.refresh, color: AppTheme.textMuted),
             onPressed: _refreshData,
           ),
-          const SizedBox(width: 10),
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout, color: AppTheme.textMuted),
+            onPressed: () => widget.session.logout(),
+          ),
+          const SizedBox(width: 6),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
@@ -178,15 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _navTab(0, 'Driver Portal', Icons.local_shipping_outlined),
-                  const SizedBox(width: 12),
-                  _navTab(1, 'Dispatcher Console', Icons.dashboard_outlined),
-                  const SizedBox(width: 12),
-                  _navTab(2, 'Audit History', Icons.history_rounded),
-                ],
-              ),
+              child: Row(children: _navTabs()),
             ),
           ),
         ),
@@ -197,21 +209,43 @@ class _HomeScreenState extends State<HomeScreen> {
               ? _buildOfflineState()
               : IndexedStack(
                   index: _currentTabIndex,
-                  children: [
-                    DriverScreen(
-                      plan: _latestPlan,
-                      locations: _locations,
-                      onRefresh: _refreshData,
-                    ),
-                    DispatcherScreen(
-                      plan: _latestPlan,
-                      locations: _locations,
-                      onRefresh: _refreshData,
-                    ),
-                    const HistoryScreen(),
-                  ],
+                  children: _tabViews(),
                 ),
     );
+  }
+
+  List<Widget> _navTabs() {
+    if (widget.session.isDriver) {
+      return [_navTab(0, 'Driver Portal', Icons.local_shipping_outlined)];
+    }
+    return [
+      _navTab(0, 'Driver Portal', Icons.local_shipping_outlined),
+      const SizedBox(width: 12),
+      _navTab(1, 'Dispatcher Console', Icons.dashboard_outlined),
+      const SizedBox(width: 12),
+      _navTab(2, 'Audit History', Icons.history_rounded),
+    ];
+  }
+
+  List<Widget> _tabViews() {
+    final driver = DriverScreen(
+      plan: _latestPlan,
+      locations: _locations,
+      onRefresh: _refreshData,
+      lockedVehicleId: widget.session.user?.vehicleId,
+    );
+    if (widget.session.isDriver) {
+      return [driver];
+    }
+    return [
+      driver,
+      DispatcherScreen(
+        plan: _latestPlan,
+        locations: _locations,
+        onRefresh: _refreshData,
+      ),
+      const HistoryScreen(),
+    ];
   }
 
   Widget _navTab(int index, String title, IconData icon) {

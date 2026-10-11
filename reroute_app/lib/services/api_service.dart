@@ -5,11 +5,78 @@ import '../models/models.dart';
 class ApiService {
   // Default to localhost, configurable via UI settings if running on emulator / remote
   static String baseUrl = 'http://127.0.0.1:8000';
+  static String? token;
 
-  static Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
+  static Map<String, String> get _headers {
+    final headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (token != null && token!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  static String _detail(dynamic body) {
+    if (body is Map && body['detail'] != null) {
+      return body['detail'].toString();
+    }
+    return body.toString();
+  }
+
+  static Future<AuthResult> login(String email, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/login'),
+      headers: _headers,
+      body: jsonEncode({'email': email.trim(), 'password': password}),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return AuthResult(
+        token: body['token'] as String,
+        user: UserModel.fromJson(body['user'] as Map<String, dynamic>),
+      );
+    }
+    throw Exception(_detail(body));
+  }
+
+  static Future<AuthResult> register({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+    String? vehicleId,
+  }) async {
+    final payload = {
+      'email': email.trim(),
+      'password': password,
+      'name': name.trim(),
+      'role': role,
+      if (vehicleId != null) 'vehicle_id': vehicleId,
+    };
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/register'),
+      headers: _headers,
+      body: jsonEncode(payload),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return AuthResult(
+        token: body['token'] as String,
+        user: UserModel.fromJson(body['user'] as Map<String, dynamic>),
+      );
+    }
+    throw Exception(_detail(body));
+  }
+
+  static Future<UserModel> me() async {
+    final response = await http.get(Uri.parse('$baseUrl/auth/me'), headers: _headers);
+    if (response.statusCode == 200) {
+      return UserModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    }
+    throw Exception('Session expired. Please sign in again.');
+  }
 
   static Future<Map<String, dynamic>> checkHealth() async {
     final response = await http.get(Uri.parse('$baseUrl/health'), headers: _headers);

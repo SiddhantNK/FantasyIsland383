@@ -14,7 +14,7 @@ import json
 import os
 import re
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 EVENTS = {"VEHICLE_FAILURE", "ROAD_CLOSURE", "URGENT_ORDER"}
 REQUIRED = {  # fields the driver must supply (checked on the flat extraction)
     "VEHICLE_FAILURE": ["vehicle_id", "location_id", "incident_time"],

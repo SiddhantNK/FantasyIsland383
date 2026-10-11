@@ -12,7 +12,8 @@ This is the official github repository of the project built for the hackathon
 ## Supabase (once)
 1. Run the team's original schema, then `db/migration_001.sql`.
 2. Run `db/seed.sql` (or load your own data; `python -m app.seed_sql` regenerates it).
-3. `cp .env.example .env` and fill in SUPABASE_URL / SUPABASE_KEY (service_role).
+3. `cp .env.example .env` and fill in SUPABASE_URL / SUPABASE_KEY (service_role) plus AUTH_SECRET.
+4. For auth, also run `db/migration_002.sql` (creates `app_users`).
 
 ## Run
     uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -20,10 +21,17 @@ This is the official github repository of the project built for the hackathon
 Interactive docs: http://localhost:8000/docs
 
 ## Endpoints
-GET /health, /state | POST /plans/initial | GET /plans, /plans/latest, /plans/{id}, /plans/{id}/compare
+GET /health
+POST /auth/register, /auth/login | GET /auth/me
+GET /state | POST /plans/initial | GET /plans, /plans/latest, /plans/{id}, /plans/{id}/compare
 POST /incidents (form + AI parser, `source`) | POST /incidents/parse (501 until parser connected)
 GET /incidents?status=PENDING | PATCH /incidents/{id} | POST /incidents/{id}/confirm | /reject
 GET /history | POST /admin/reset (demo re-runs)
+
+All routes except `/health` and `/auth/register` + `/auth/login` require `Authorization: Bearer <token>`.
+Dispatchers can generate plans, confirm/reject incidents, and reset the demo. Drivers can view routes and report incidents.
+
+Memory-mode demo logins: `dispatcher@reroute.local` / `password123` and `driver@reroute.local` / `password123`.
 
 ## Conventions
 Times are "HH:MM" in JSON. Stops with vehicle_id=null are unassigned (BROKEN + reason).

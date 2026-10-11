@@ -10,7 +10,10 @@ from .models import DEPOT, Order, Plan, Vehicle
 
 class MemoryRepo:
     def __init__(self):
+        self._users = {}
+        self._uid = itertools.count(1)
         self.reset()
+        self._seed_users()
 
     # --- reference data
     def vehicles(self):
@@ -87,3 +90,55 @@ class MemoryRepo:
             for k, (x, y) in COORDS.items()]
         self._disruptions, self._plans, self._history = {}, {}, []
         self._did, self._pid, self._hid = itertools.count(1), itertools.count(1), itertools.count(1)
+
+    # --- users (survive demo reset)
+    def _seed_users(self):
+        from .auth import hash_password
+        if self._users:
+            return
+        self.create_user({
+            "email": "dispatcher@reroute.local",
+            "name": "Alex Dispatcher",
+            "password_hash": hash_password("password123"),
+            "role": "DISPATCHER",
+            "vehicle_id": None,
+        })
+        self.create_user({
+            "email": "driver@reroute.local",
+            "name": "Jordan Driver",
+            "password_hash": hash_password("password123"),
+            "role": "DRIVER",
+            "vehicle_id": "V01",
+        })
+
+    def get_user_by_email(self, email):
+        key = (email or "").strip().lower()
+        for row in self._users.values():
+            if row["email"] == key:
+                return copy.deepcopy(row)
+        return None
+
+    def get_user_by_id(self, uid):
+        if uid is None:
+            return None
+        try:
+            uid = int(uid)
+        except (TypeError, ValueError):
+            return None
+        row = self._users.get(uid)
+        return copy.deepcopy(row) if row else None
+
+    def create_user(self, row):
+        email = row["email"].strip().lower()
+        if self.get_user_by_email(email):
+            raise ValueError("Email already registered")
+        stored = {
+            "id": next(self._uid),
+            "email": email,
+            "name": row["name"].strip(),
+            "password_hash": row["password_hash"],
+            "role": row["role"],
+            "vehicle_id": row.get("vehicle_id"),
+        }
+        self._users[stored["id"]] = stored
+        return copy.deepcopy(stored)

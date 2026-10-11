@@ -129,3 +129,25 @@ class SupabaseRepo:
                                     "failed_location": None}).neq("id", "").execute()
         self._t("orders").update({"status": "PENDING"}).neq("id", "").execute()
         self._order_loc = {}
+
+    # --- users
+    def get_user_by_email(self, email):
+        key = (email or "").strip().lower()
+        data = self._t("app_users").select("*").eq("email", key).limit(1).execute().data
+        return data[0] if data else None
+
+    def get_user_by_id(self, uid):
+        if uid is None:
+            return None
+        data = self._t("app_users").select("*").eq("id", uid).limit(1).execute().data
+        return data[0] if data else None
+
+    def create_user(self, row):
+        payload = {
+            "email": row["email"].strip().lower(),
+            "name": row["name"].strip(),
+            "password_hash": row["password_hash"],
+            "role": row["role"],
+            "vehicle_id": row.get("vehicle_id"),
+        }
+        return self._t("app_users").insert(payload).execute().data[0]

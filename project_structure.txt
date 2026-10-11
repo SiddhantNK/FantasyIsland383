@@ -1,0 +1,33 @@
+project structure for: d:\College\Second Year\Heckthon\FantasyIsland383
+==================================================
+
+├── reroute-backend/
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── db.py
+│   │   ├── demo_data.py
+│   │   ├── main.py
+│   │   ├── models.py
+│   │   ├── parse_stub.py
+│   │   ├── replan.py
+│   │   ├── repo_memory.py
+│   │   ├── seed_sql.py
+│   │   ├── service.py
+│   │   ├── solver.py
+│   │   ├── travel.py
+│   │   └── validation.py
+│   ├── db/
+│   │   ├── migration_001.sql
+│   │   ├── schema.sql
+│   │   └── seed.sql
+│   ├── tests/
+│   │   ├── test_replan.py
+│   │   ├── test_service.py
+│   │   └── test_solver.py
+│   ├── .env.example
+│   └── conftest.py
+├── .gitignore
+├── LICENSE
+├── parser.py
+├── README.md
+└── requirements.txt

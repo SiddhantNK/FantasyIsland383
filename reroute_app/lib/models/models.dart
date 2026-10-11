@@ -1,5 +1,49 @@
 // Data models corresponding to ReRoute backend structures
 
+class UserModel {
+  final int id;
+  final String email;
+  final String name;
+  final String role; // DRIVER | DISPATCHER
+  final String? vehicleId;
+
+  UserModel({
+    required this.id,
+    required this.email,
+    required this.name,
+    required this.role,
+    this.vehicleId,
+  });
+
+  bool get isDispatcher => role == 'DISPATCHER';
+  bool get isDriver => role == 'DRIVER';
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'] is int ? json['id'] : int.tryParse('${json['id']}') ?? 0,
+      email: json['email'] ?? '',
+      name: json['name'] ?? '',
+      role: json['role'] ?? 'DRIVER',
+      vehicleId: json['vehicle_id'],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'email': email,
+        'name': name,
+        'role': role,
+        'vehicle_id': vehicleId,
+      };
+}
+
+class AuthResult {
+  final String token;
+  final UserModel user;
+
+  AuthResult({required this.token, required this.user});
+}
+
 class VehicleModel {
   final String id;
   final double weightCapKg;

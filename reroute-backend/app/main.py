@@ -14,12 +14,12 @@ try:
 except ImportError:
     pass
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from . import service
+from . import auth, service
 from .parse_stub import parse_incident
 from .replan import IncidentError
 
@@ -34,10 +34,14 @@ def make_repo():
 
 
 repo = make_repo()
+auth.bind_repo(repo)
 ENGINE = os.getenv("REROUTE_ENGINE", "ortools")
 
 app = FastAPI(title="ReRoute API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+AuthUser = Depends(auth.get_user)
+Dispatcher = Depends(auth.require_roles("DISPATCHER"))
 
 
 @app.exception_handler(service.ServiceError)
@@ -76,8 +80,26 @@ class ConfirmIn(BaseModel):
     corrections: Optional[dict] = None
 
 
+class RegisterIn(BaseModel):
+    email: str
+    password: str
+    name: str
+    role: str = "DISPATCHER"
+    vehicle_id: Optional[str] = None
+
+
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
 def _dump(m):
     return m.model_dump() if hasattr(m, "model_dump") else m.dict()
+
+
+def _auth_payload(user_row):
+    user = auth.public_user(user_row)
+    return {"token": auth.create_token(user), "user": user}
 
 
 @app.get("/health")
@@ -85,24 +107,60 @@ def health():
     return {"ok": True, "engine": ENGINE, "repo": type(repo).__name__}
 
 
+@app.post("/auth/register")
+def auth_register(body: RegisterIn):
+    auth.validate_register(body.email, body.password, body.name, body.role, body.vehicle_id)
+    if body.vehicle_id and body.vehicle_id not in {v.id for v in repo.vehicles()}:
+        raise HTTPException(422, f"Unknown vehicle {body.vehicle_id}")
+    try:
+        row = repo.create_user({
+            "email": body.email,
+            "name": body.name,
+            "password_hash": auth.hash_password(body.password),
+            "role": body.role,
+            "vehicle_id": body.vehicle_id if body.role == "DRIVER" else None,
+        })
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "duplicate" in msg or "unique" in msg:
+            raise HTTPException(409, "Email already registered") from exc
+        raise
+    return _auth_payload(row)
+
+
+@app.post("/auth/login")
+def auth_login(body: LoginIn):
+    row = repo.get_user_by_email(body.email)
+    if row is None or not auth.verify_password(body.password, row["password_hash"]):
+        raise HTTPException(401, "Invalid email or password")
+    return _auth_payload(row)
+
+
+@app.get("/auth/me")
+def auth_me(user=AuthUser):
+    return user
+
+
 @app.get("/state")
-def state():
+def state(user=AuthUser):
     return service.get_state(repo)
 
 
 # ---- plans
 @app.post("/plans/initial")
-def plans_initial():
+def plans_initial(user=Dispatcher):
     return service.create_initial_plan(repo, engine=ENGINE)
 
 
 @app.get("/plans")
-def plans_list():
+def plans_list(user=AuthUser):
     return repo.list_plans()
 
 
 @app.get("/plans/latest")
-def plans_latest():
+def plans_latest(user=AuthUser):
     plan = repo.latest_plan()
     if plan is None:
         raise HTTPException(404, "No plan yet")
@@ -110,7 +168,7 @@ def plans_latest():
 
 
 @app.get("/plans/{plan_id}")
-def plans_get(plan_id: int):
+def plans_get(plan_id: int, user=AuthUser):
     plan = repo.get_plan(plan_id)
     if plan is None:
         raise HTTPException(404, f"Plan #{plan_id} not found")
@@ -118,14 +176,14 @@ def plans_get(plan_id: int):
 
 
 @app.get("/plans/{plan_id}/compare")
-def plans_compare(plan_id: int):
+def plans_compare(plan_id: int, user=AuthUser):
     """Compare a revised plan with the plan it was derived from."""
     return service.compare_with_parent(repo, plan_id)
 
 
 # ---- incidents
 @app.post("/incidents/parse")
-def incidents_parse(body: ParseIn):
+def incidents_parse(body: ParseIn, user=AuthUser):
     """Free text -> structured preview (not stored). Needs the AI parser."""
     vids = [v.id for v in repo.vehicles()]
     lids = [l["id"] for l in repo.locations()]
@@ -137,18 +195,22 @@ def incidents_parse(body: ParseIn):
 
 
 @app.post("/incidents")
-def incidents_create(body: IncidentIn):
+def incidents_create(body: IncidentIn, user=AuthUser):
     """Both the form and the AI parser end up here (set `source`)."""
-    return service.submit_incident(repo, _dump(body))
+    payload = _dump(body)
+    if user["role"] == "DRIVER" and user.get("vehicle_id"):
+        if payload.get("event_type") == "VEHICLE_FAILURE":
+            payload["vehicle_id"] = user["vehicle_id"]
+    return service.submit_incident(repo, payload)
 
 
 @app.get("/incidents")
-def incidents_list(status: Optional[str] = None):
+def incidents_list(status: Optional[str] = None, user=AuthUser):
     return repo.list_disruptions(status.upper() if status else None)
 
 
 @app.get("/incidents/{incident_id}")
-def incidents_get(incident_id: int):
+def incidents_get(incident_id: int, user=AuthUser):
     row = repo.get_disruption(incident_id)
     if row is None:
         raise HTTPException(404, f"Incident #{incident_id} not found")
@@ -156,28 +218,28 @@ def incidents_get(incident_id: int):
 
 
 @app.patch("/incidents/{incident_id}")
-def incidents_correct(incident_id: int, body: CorrectionsIn):
+def incidents_correct(incident_id: int, body: CorrectionsIn, user=Dispatcher):
     return service.update_incident(repo, incident_id, body.corrections)
 
 
 @app.post("/incidents/{incident_id}/confirm")
-def incidents_confirm(incident_id: int, body: Optional[ConfirmIn] = None):
+def incidents_confirm(incident_id: int, body: Optional[ConfirmIn] = None, user=Dispatcher):
     corrections = body.corrections if body else None
     return service.confirm_incident(repo, incident_id, corrections, engine=ENGINE)
 
 
 @app.post("/incidents/{incident_id}/reject")
-def incidents_reject(incident_id: int):
+def incidents_reject(incident_id: int, user=Dispatcher):
     return service.reject_incident(repo, incident_id)
 
 
 # ---- history / admin
 @app.get("/history")
-def history():
+def history(user=AuthUser):
     return repo.list_history()
 
 
 @app.post("/admin/reset")
-def admin_reset():
+def admin_reset(user=Dispatcher):
     repo.reset()
     return {"ok": True}

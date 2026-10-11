@@ -7,12 +7,14 @@ class DriverScreen extends StatefulWidget {
   final PlanModel? plan;
   final List<LocationModel> locations;
   final VoidCallback onRefresh;
+  final String? lockedVehicleId;
 
   const DriverScreen({
     super.key,
     required this.plan,
     required this.locations,
     required this.onRefresh,
+    this.lockedVehicleId,
   });
 
   @override
@@ -20,14 +22,23 @@ class DriverScreen extends StatefulWidget {
 }
 
 class _DriverScreenState extends State<DriverScreen> {
-  String _selectedVehicleId = 'V01';
+  late String _selectedVehicleId;
   List<DisruptionModel> _recentReports = [];
   bool _loadingReports = false;
 
   @override
   void initState() {
     super.initState();
+    _selectedVehicleId = widget.lockedVehicleId ?? 'V01';
     _loadRecentReports();
+  }
+
+  @override
+  void didUpdateWidget(covariant DriverScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.lockedVehicleId != null && widget.lockedVehicleId != _selectedVehicleId) {
+      _selectedVehicleId = widget.lockedVehicleId!;
+    }
   }
 
   Future<void> _loadRecentReports() async {
@@ -101,7 +112,7 @@ class _DriverScreenState extends State<DriverScreen> {
                 ],
               ),
               const Spacer(),
-              // Vehicle Selector Pills
+              // Vehicle Selector Pills (dispatchers can switch; drivers stay on their truck)
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
@@ -112,8 +123,9 @@ class _DriverScreenState extends State<DriverScreen> {
                 child: Row(
                   children: ['V01', 'V02', 'V03'].map((vId) {
                     final selected = _selectedVehicleId == vId;
+                    final locked = widget.lockedVehicleId != null;
                     return GestureDetector(
-                      onTap: () => setState(() => _selectedVehicleId = vId),
+                      onTap: locked ? null : () => setState(() => _selectedVehicleId = vId),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
@@ -125,7 +137,9 @@ class _DriverScreenState extends State<DriverScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: selected ? Colors.white : AppTheme.textMuted,
+                            color: selected
+                                ? Colors.white
+                                : (locked ? AppTheme.textDim : AppTheme.textMuted),
                           ),
                         ),
                       ),
