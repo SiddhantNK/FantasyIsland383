@@ -24,7 +24,6 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
   List<DisruptionModel> _pendingIncidents = [];
   PlanComparisonModel? _comparison;
   bool _loadingPending = false;
-  bool _loadingComparison = false;
   bool _actionInProgress = false;
   String? _selectedVehicleFilter;
 
@@ -59,33 +58,30 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
   }
 
   Future<void> _loadComparisonIfApplicable() async {
-    if (widget.plan?.id == null || widget.plan!.parentPlanId == null) {
-      setState(() => _comparison = null);
+    final plan = widget.plan;
+    if (plan == null || plan.id == null || plan.parentPlanId == null) {
+      if (mounted) setState(() => _comparison = null);
       return;
     }
-    setState(() => _loadingComparison = true);
     try {
-      final comp = await ApiService.getPlanComparison(widget.plan!.id!);
+      final comp = await ApiService.getPlanComparison(plan.id!);
       if (mounted) {
         setState(() {
           _comparison = comp;
-          _loadingComparison = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loadingComparison = false);
-    }
+    } catch (_) {}
   }
 
-  Future<void> _handleConfirmIncident(DisruptionModel inc) async {
+  Future<void> _handleConfirmIncident(DisruptionModel incident) async {
     setState(() => _actionInProgress = true);
     try {
-      await ApiService.confirmIncident(inc.id);
+      await ApiService.confirmIncident(incident.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppTheme.emerald,
-            content: Text('Incident #${inc.id} confirmed! Revised route plan generated.'),
+            content: Text('Incident #${incident.id} confirmed! Deterministic replan generated.'),
           ),
         );
       }
@@ -93,13 +89,8 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
       widget.onRefresh();
     } catch (e) {
       if (mounted) {
-        final msg = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.rose,
-            content: Text('Cannot Confirm: $msg'),
-            duration: const Duration(seconds: 5),
-          ),
+          SnackBar(backgroundColor: AppTheme.rose, content: Text('Confirm failed: $e')),
         );
       }
     } finally {
@@ -107,17 +98,16 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
     }
   }
 
-  Future<void> _handleRejectIncident(DisruptionModel inc) async {
+  Future<void> _handleRejectIncident(DisruptionModel incident) async {
     setState(() => _actionInProgress = true);
     try {
-      await ApiService.rejectIncident(inc.id);
+      await ApiService.rejectIncident(incident.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Incident #${inc.id} rejected.')),
+          SnackBar(content: Text('Incident #${incident.id} rejected.')),
         );
       }
       await _loadPendingIncidents();
-      widget.onRefresh();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,7 +125,10 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
       await ApiService.createInitialPlan();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(backgroundColor: AppTheme.emerald, content: Text('Initial route plan generated!')),
+          const SnackBar(
+            backgroundColor: AppTheme.emerald,
+            content: Text('Initial plan computed and dispatched successfully.'),
+          ),
         );
       }
       widget.onRefresh();
@@ -156,7 +149,7 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
       await ApiService.resetDemo();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('State reset successfully.')),
+          const SnackBar(content: Text('Demo state reset successfully.')),
         );
       }
       await _loadPendingIncidents();
@@ -177,55 +170,71 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
     final plan = widget.plan;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Dispatcher Header & Controls
+          // Header & Top Actions
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Text(
-                        'Dispatcher Command Center',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textMain),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.primary),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Dispatcher Command Center',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textMain,
+                            letterSpacing: -0.3,
+                          ),
                         ),
-                        child: Text(
-                          plan != null ? 'Plan Version #${plan.version}' : 'No Active Plan',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primaryLight),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                          decoration: BoxDecoration(
+                            color: plan != null ? AppTheme.primarySoft : AppTheme.surfaceElevated,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: plan != null
+                                  ? AppTheme.primary.withValues(alpha: 0.3)
+                                  : AppTheme.border,
+                            ),
+                          ),
+                          child: Text(
+                            plan != null ? 'Plan Version #${plan.version}' : 'No Active Plan',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: plan != null ? AppTheme.primary : AppTheme.textMuted,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Incident review, deterministic optimization, and fleet route management',
-                    style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
-                  ),
-                ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Live incident review, deterministic rerouting, and active fleet tracking',
+                      style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ),
               ),
-              const Spacer(),
-              // Demo / Action Buttons
+              const SizedBox(width: 16),
+              // Action Buttons
               OutlinedButton.icon(
                 onPressed: _actionInProgress ? null : _handleReset,
-                icon: const Icon(Icons.restart_alt, size: 16),
+                icon: const Icon(Icons.restart_alt_rounded, size: 16),
                 label: const Text('Reset Demo'),
               ),
               const SizedBox(width: 10),
               ElevatedButton.icon(
                 onPressed: _actionInProgress ? null : (plan == null ? _handleInitialPlan : widget.onRefresh),
-                icon: Icon(plan == null ? Icons.play_arrow : Icons.refresh, size: 16),
+                icon: Icon(plan == null ? Icons.play_arrow_rounded : Icons.refresh_rounded, size: 16),
                 label: Text(plan == null ? 'Generate Plan' : 'Refresh'),
               ),
             ],
@@ -233,140 +242,187 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
           const SizedBox(height: 24),
 
           // PENDING DISRUPTIONS REVIEW INBOX
-          Row(
-            children: [
-              const Icon(Icons.inbox_outlined, color: AppTheme.amber, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'Pending Disruptions Queue',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textMain),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _pendingIncidents.isNotEmpty ? AppTheme.amber.withOpacity(0.2) : AppTheme.surfaceElevated,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _pendingIncidents.isNotEmpty ? AppTheme.amber : AppTheme.border),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceWhite,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+              boxShadow: AppTheme.shadowSm,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: _pendingIncidents.isNotEmpty ? AppTheme.amberSoft : AppTheme.surfaceElevated,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        Icons.inbox_rounded,
+                        color: _pendingIncidents.isNotEmpty ? AppTheme.amber : AppTheme.textMuted,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Pending Disruptions Queue',
+                      style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _pendingIncidents.isNotEmpty ? AppTheme.amberSoft : AppTheme.surfaceElevated,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _pendingIncidents.isNotEmpty
+                              ? AppTheme.amber.withValues(alpha: 0.3)
+                              : AppTheme.border,
+                        ),
+                      ),
+                      child: Text(
+                        '${_pendingIncidents.length}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _pendingIncidents.isNotEmpty ? AppTheme.amber : AppTheme.textMuted,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: _loadPendingIncidents,
+                      icon: const Icon(Icons.sync_rounded, size: 15),
+                      label: const Text('Check Inbox'),
+                    ),
+                  ],
                 ),
-                child: Text(
-                  '${_pendingIncidents.length}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: _pendingIncidents.isNotEmpty ? AppTheme.amber : AppTheme.textMuted,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: _loadPendingIncidents,
-                icon: const Icon(Icons.refresh, size: 14),
-                label: const Text('Check Inbox'),
-              ),
-            ],
+                const SizedBox(height: 12),
+                if (_loadingPending)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                    ),
+                  )
+                else if (_pendingIncidents.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.emeraldSoft,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.emerald.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.check_circle_outline_rounded, color: AppTheme.emerald, size: 18),
+                        SizedBox(width: 10),
+                        Text(
+                          'No pending disruptions. Fleet operations are running on schedule.',
+                          style: TextStyle(color: AppTheme.emerald, fontSize: 13, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ..._pendingIncidents.map((inc) => _PendingIncidentCard(
+                        incident: inc,
+                        onConfirm: () => _handleConfirmIncident(inc),
+                        onReject: () => _handleRejectIncident(inc),
+                      )),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
 
-          if (_loadingPending)
-            const Center(child: CircularProgressIndicator())
-          else if (_pendingIncidents.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceCard,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppTheme.border),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: AppTheme.emerald, size: 20),
-                  SizedBox(width: 12),
-                  Text(
-                    'No pending disruptions. Fleet operations running normally.',
-                    style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                  ),
-                ],
-              ),
-            )
-          else
-            ..._pendingIncidents.map((inc) => _PendingIncidentCard(
-                  incident: inc,
-                  onConfirm: () => _handleConfirmIncident(inc),
-                  onReject: () => _handleRejectIncident(inc),
-                )),
-
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
           // REPLAN DIFF / PLAN COMPARISON
           if (_comparison != null) ...[
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.primary.withOpacity(0.4)),
+                color: AppTheme.surfaceWhite,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
+                boxShadow: AppTheme.shadowSm,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.compare_arrows, color: AppTheme.primaryLight, size: 20),
-                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primarySoft,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.compare_arrows_rounded, color: AppTheme.primary, size: 18),
+                      ),
+                      const SizedBox(width: 10),
                       Text(
-                        'Replan Changes: Plan #${_comparison!.parentPlanId} ➔ Plan #${_comparison!.planId}',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+                        'Replan Comparison: Plan #${_comparison!.parentPlanId} → Plan #${_comparison!.planId}',
+                        style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: AppTheme.textMain),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // Count pills
-                  Row(
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      _countBadge('KEPT', _comparison!.counts['KEPT'] ?? 0, AppTheme.emerald),
-                      const SizedBox(width: 10),
-                      _countBadge('MOVED', _comparison!.counts['MOVED'] ?? 0, AppTheme.amber),
-                      const SizedBox(width: 10),
-                      _countBadge('COMPLETED', _comparison!.counts['COMPLETED'] ?? 0, AppTheme.indigo),
-                      const SizedBox(width: 10),
-                      _countBadge('BROKEN', _comparison!.counts['BROKEN'] ?? 0, AppTheme.rose),
+                      _countBadge('KEPT', _comparison!.counts['KEPT'] ?? 0, AppTheme.emerald, AppTheme.emeraldSoft),
+                      _countBadge('MOVED', _comparison!.counts['MOVED'] ?? 0, AppTheme.amber, AppTheme.amberSoft),
+                      _countBadge('COMPLETED', _comparison!.counts['COMPLETED'] ?? 0, AppTheme.indigo, AppTheme.indigoSoft),
+                      _countBadge('BROKEN', _comparison!.counts['BROKEN'] ?? 0, AppTheme.rose, AppTheme.roseSoft),
                     ],
                   ),
                   const SizedBox(height: 14),
-                  const Divider(color: AppTheme.border),
-                  const SizedBox(height: 8),
-                  const Text('Detailed Order Changes & Explanations:',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textMuted)),
+                  const Divider(color: AppTheme.border, height: 1),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Order Changes & Reasons:',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppTheme.textSecondary),
+                  ),
                   const SizedBox(height: 8),
                   ..._comparison!.changes.map((ch) {
                     final status = ch['status'] ?? '';
                     final reason = ch['reason'] ?? '';
                     Color color;
+                    Color softBg;
                     switch (status) {
                       case 'BROKEN':
                         color = AppTheme.rose;
+                        softBg = AppTheme.roseSoft;
                         break;
                       case 'MOVED':
                         color = AppTheme.amber;
+                        softBg = AppTheme.amberSoft;
                         break;
                       case 'COMPLETED':
                         color = AppTheme.emerald;
+                        softBg = AppTheme.emeraldSoft;
                         break;
                       default:
-                        color = AppTheme.textDim;
+                        color = AppTheme.textMuted;
+                        softBg = AppTheme.surfaceElevated;
                     }
                     return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.symmetric(vertical: 3.5),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
-                              color: color.withOpacity(0.15),
+                              color: softBg,
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: color.withOpacity(0.6)),
+                              border: Border.all(color: color.withValues(alpha: 0.3)),
                             ),
                             child: Text(
                               status,
@@ -374,11 +430,15 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          Text('${ch['order_id']}: ',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textMain)),
+                          Text(
+                            '${ch['order_id']}: ',
+                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+                          ),
                           Expanded(
-                            child: Text(reason,
-                                style: TextStyle(fontSize: 12, color: color == AppTheme.textDim ? AppTheme.textMuted : color)),
+                            child: Text(
+                              reason,
+                              style: const TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
+                            ),
                           ),
                         ],
                       ),
@@ -387,7 +447,7 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
           ],
 
           // INTERACTIVE NETWORK MAP
@@ -395,13 +455,19 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
             children: [
               const Text(
                 'Live Network Route Map',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textMain,
+                  letterSpacing: -0.2,
+                ),
               ),
               const Spacer(),
               if (_selectedVehicleFilter != null)
-                TextButton(
+                TextButton.icon(
                   onPressed: () => setState(() => _selectedVehicleFilter = null),
-                  child: const Text('Show All Vehicles'),
+                  icon: const Icon(Icons.clear_rounded, size: 14),
+                  label: const Text('Show All Vehicles'),
                 ),
             ],
           ),
@@ -415,12 +481,17 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
               activeClosures: _pendingIncidents.where((i) => i.eventType == 'ROAD_CLOSURE').toList(),
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
           // FLEET CAPACITY & VEHICLE CARDS
           const Text(
             'Active Fleet Overview',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textMain,
+              letterSpacing: -0.2,
+            ),
           ),
           const SizedBox(height: 12),
           if (plan != null)
@@ -429,24 +500,26 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
                 final isNarrow = constraints.maxWidth < 650;
                 final cards = plan.vehicles.map((v) {
                   final selected = _selectedVehicleFilter == v.id;
-                  final card = GestureDetector(
+                  final card = InkWell(
                     onTap: () {
                       setState(() {
                         _selectedVehicleFilter = selected ? null : v.id;
                       });
                     },
+                    borderRadius: BorderRadius.circular(12),
                     child: Container(
                       margin: EdgeInsets.only(right: isNarrow ? 0 : 12, bottom: isNarrow ? 12 : 0),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppTheme.surfaceCard,
-                        borderRadius: BorderRadius.circular(14),
+                        color: selected ? AppTheme.primarySoft : AppTheme.surfaceWhite,
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: selected
                               ? AppTheme.primary
-                              : (v.isFailed ? AppTheme.rose.withOpacity(0.5) : AppTheme.border),
-                          width: selected ? 2 : 1,
+                              : (v.isFailed ? AppTheme.rose.withValues(alpha: 0.5) : AppTheme.border),
+                          width: selected ? 1.6 : 1,
                         ),
+                        boxShadow: AppTheme.shadowSm,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,10 +532,15 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
                               ),
                               const Spacer(),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                                 decoration: BoxDecoration(
-                                  color: v.isFailed ? AppTheme.rose.withOpacity(0.2) : AppTheme.emerald.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(4),
+                                  color: v.isFailed ? AppTheme.roseSoft : AppTheme.emeraldSoft,
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(
+                                    color: v.isFailed
+                                        ? AppTheme.rose.withValues(alpha: 0.3)
+                                        : AppTheme.emerald.withValues(alpha: 0.3),
+                                  ),
                                 ),
                                 child: Text(
                                   v.status,
@@ -476,19 +554,29 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          Text('Stops: ${v.stops.length}', style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Assigned Stops: ${v.stops.length}',
+                                  style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                              Text('${v.weightUtilPct.toStringAsFixed(0)}% Utilized',
+                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                            ],
+                          ),
                           const SizedBox(height: 6),
-                          Text('Weight: ${v.pendingWeightKg.toStringAsFixed(0)} / ${v.weightCapKg.toStringAsFixed(0)} kg (${v.weightUtilPct.toStringAsFixed(0)}%)',
-                              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                          const SizedBox(height: 4),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
                               value: (v.weightUtilPct / 100).clamp(0.0, 1.0),
-                              minHeight: 5,
+                              minHeight: 6,
                               backgroundColor: AppTheme.surfaceElevated,
                               valueColor: AlwaysStoppedAnimation(v.isFailed ? AppTheme.rose : AppTheme.primary),
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Weight: ${v.pendingWeightKg.toStringAsFixed(0)} / ${v.weightCapKg.toStringAsFixed(0)} kg',
+                            style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
                           ),
                         ],
                       ),
@@ -505,13 +593,13 @@ class _DispatcherScreenState extends State<DispatcherScreen> {
     );
   }
 
-  Widget _countBadge(String label, int count, Color color) {
+  Widget _countBadge(String label, int count, Color color, Color softBg) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.6)),
+        color: softBg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -540,12 +628,14 @@ class _PendingIncidentCard extends StatelessWidget {
     final hasErrors = incident.validationErrors.isNotEmpty;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: hasErrors ? AppTheme.rose.withOpacity(0.6) : AppTheme.amber.withOpacity(0.6)),
+        color: AppTheme.surfaceSubtle,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: hasErrors ? AppTheme.rose.withValues(alpha: 0.4) : AppTheme.amber.withValues(alpha: 0.4),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -553,15 +643,20 @@ class _PendingIncidentCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                 decoration: BoxDecoration(
-                  color: incident.source == 'AI_PARSER' ? AppTheme.indigo.withOpacity(0.2) : AppTheme.surfaceElevated,
-                  borderRadius: BorderRadius.circular(6),
+                  color: incident.source == 'AI_PARSER' ? AppTheme.indigoSoft : AppTheme.surfaceElevated,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: incident.source == 'AI_PARSER'
+                        ? AppTheme.indigo.withValues(alpha: 0.3)
+                        : AppTheme.border,
+                  ),
                 ),
                 child: Text(
                   incident.source,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                     color: incident.source == 'AI_PARSER' ? AppTheme.indigo : AppTheme.textMuted,
                   ),
@@ -570,7 +665,7 @@ class _PendingIncidentCard extends StatelessWidget {
               const SizedBox(width: 10),
               Text(
                 'Incident #${incident.id}: ${incident.eventType}',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppTheme.textMain),
               ),
               const Spacer(),
               Text(
@@ -583,40 +678,42 @@ class _PendingIncidentCard extends StatelessWidget {
           if (incident.rawText != null) ...[
             Text(
               '"${incident.rawText}"',
-              style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: AppTheme.textMuted),
+              style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: AppTheme.textSecondary),
             ),
             const SizedBox(height: 8),
           ],
           Wrap(
             spacing: 16,
+            runSpacing: 4,
             children: [
               if (incident.vehicleId != null)
-                Text('Vehicle: ${incident.vehicleId}', style: const TextStyle(fontSize: 12, color: AppTheme.textMain)),
+                Text('Vehicle: ${incident.vehicleId}', style: const TextStyle(fontSize: 12.5, color: AppTheme.textSecondary)),
               if (incident.locationId != null)
-                Text('Location: ${incident.locationId}', style: const TextStyle(fontSize: 12, color: AppTheme.textMain)),
+                Text('Location: ${incident.locationId}', style: const TextStyle(fontSize: 12.5, color: AppTheme.textSecondary)),
               if (incident.fromLocation != null)
-                Text('From: ${incident.fromLocation} ➔ ${incident.toLocation}',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textMain)),
+                Text('Closure: ${incident.fromLocation} → ${incident.toLocation}',
+                    style: const TextStyle(fontSize: 12.5, color: AppTheme.textSecondary)),
               if (incident.endTime != null)
-                Text('Until: ${incident.endTime}', style: const TextStyle(fontSize: 12, color: AppTheme.textMain)),
+                Text('Until: ${incident.endTime}', style: const TextStyle(fontSize: 12.5, color: AppTheme.textSecondary)),
             ],
           ),
           if (hasErrors) ...[
             const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: AppTheme.rose.withOpacity(0.15),
+                color: AppTheme.roseSoft,
                 borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppTheme.rose.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning, color: AppTheme.rose, size: 14),
-                  const SizedBox(width: 6),
+                  const Icon(Icons.warning_amber_rounded, color: AppTheme.rose, size: 16),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Validation warning: ${incident.validationErrors.join("; ")}',
-                      style: const TextStyle(fontSize: 11, color: AppTheme.rose),
+                      style: const TextStyle(fontSize: 11.5, color: AppTheme.rose, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -629,15 +726,22 @@ class _PendingIncidentCard extends StatelessWidget {
             children: [
               OutlinedButton(
                 onPressed: onReject,
-                style: OutlinedButton.styleFrom(foregroundColor: AppTheme.rose),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.rose,
+                  side: BorderSide(color: AppTheme.rose.withValues(alpha: 0.4)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                ),
                 child: const Text('Reject'),
               ),
               const SizedBox(width: 10),
               ElevatedButton.icon(
                 onPressed: onConfirm,
-                icon: const Icon(Icons.check, size: 16),
+                icon: const Icon(Icons.check_rounded, size: 16),
                 label: const Text('Confirm & Re-Optimize'),
-                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.emerald),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.emerald,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
               ),
             ],
           ),

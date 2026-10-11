@@ -20,12 +20,13 @@ class RouteMapWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCard,
-        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.surfaceWhite,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
+        boxShadow: AppTheme.shadowSm,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         child: Stack(
           children: [
             // Grid background
@@ -48,11 +49,12 @@ class RouteMapWidget extends StatelessWidget {
               left: 14,
               bottom: 14,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceDark.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppTheme.surfaceWhite.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppTheme.border),
+                  boxShadow: AppTheme.shadowSm,
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -79,8 +81,8 @@ class RouteMapWidget extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 10,
-          height: 10,
+          width: 9,
+          height: 9,
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
@@ -89,7 +91,11 @@ class RouteMapWidget extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppTheme.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -100,7 +106,7 @@ class GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppTheme.border.withValues(alpha: 0.25)
+      ..color = AppTheme.border.withValues(alpha: 0.45)
       ..strokeWidth = 1;
 
     const step = 32.0;
@@ -186,15 +192,15 @@ class NetworkPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final locMap = {for (var l in locations) l.id: l};
 
-    // Draw active road closures first (dashed/bold red line)
+    // Draw active road closures first (bold red line)
     for (var c in activeClosures) {
       if (c.fromLocation != null && c.toLocation != null) {
         final p1 = _getOffset(locMap, c.fromLocation!, size);
         final p2 = _getOffset(locMap, c.toLocation!, size);
         if (p1 != null && p2 != null) {
           final paint = Paint()
-            ..color = AppTheme.rose.withValues(alpha: 0.85)
-            ..strokeWidth = 4.5
+            ..color = AppTheme.rose
+            ..strokeWidth = 4.0
             ..strokeCap = StrokeCap.round;
           canvas.drawLine(p1, p2, paint);
         }
@@ -212,8 +218,8 @@ class NetworkPainter extends CustomPainter {
 
         final color = _vehicleColor(v.id);
         final linePaint = Paint()
-          ..color = v.isFailed ? AppTheme.textDim.withValues(alpha: 0.3) : color.withValues(alpha: 0.85)
-          ..strokeWidth = 3.0
+          ..color = v.isFailed ? AppTheme.textDim.withValues(alpha: 0.35) : color
+          ..strokeWidth = 2.8
           ..style = PaintingStyle.stroke
           ..strokeJoin = StrokeJoin.round;
 
@@ -232,7 +238,7 @@ class NetworkPainter extends CustomPainter {
       }
     }
 
-    // Determine all node IDs to draw (locations or fallback keys)
+    // Determine all node IDs to draw
     final nodeIds = locations.isNotEmpty ? locations.map((l) => l.id).toSet() : fallbackCoords.keys.toSet();
 
     for (var id in nodeIds) {
@@ -241,23 +247,23 @@ class NetworkPainter extends CustomPainter {
       final isDepot = id == 'DEPOT';
 
       final nodePaint = Paint()
-        ..color = isDepot ? AppTheme.amber : AppTheme.surfaceDark
+        ..color = isDepot ? AppTheme.amber : AppTheme.surfaceWhite
         ..style = PaintingStyle.fill;
 
       final borderPaint = Paint()
-        ..color = isDepot ? Colors.white : AppTheme.borderLight
+        ..color = isDepot ? AppTheme.amber : AppTheme.borderLight
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;
 
-      // Glow effect for depot
+      // Subtle shadow for depot
       if (isDepot) {
         final glowPaint = Paint()
-          ..color = AppTheme.amber.withValues(alpha: 0.35)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
-        canvas.drawCircle(pt, 16, glowPaint);
+          ..color = AppTheme.amber.withValues(alpha: 0.25)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+        canvas.drawCircle(pt, 14, glowPaint);
       }
 
-      final radius = isDepot ? 10.0 : 7.0;
+      final radius = isDepot ? 9.0 : 6.0;
       canvas.drawCircle(pt, radius, nodePaint);
       canvas.drawCircle(pt, radius, borderPaint);
 
@@ -266,8 +272,8 @@ class NetworkPainter extends CustomPainter {
         text: TextSpan(
           text: id,
           style: TextStyle(
-            color: isDepot ? AppTheme.amberLight : AppTheme.textMuted,
-            fontSize: isDepot ? 11 : 9,
+            color: isDepot ? AppTheme.amber : AppTheme.textSecondary,
+            fontSize: isDepot ? 11 : 9.5,
             fontWeight: FontWeight.w700,
           ),
         ),

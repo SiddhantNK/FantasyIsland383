@@ -15,7 +15,7 @@ class ReRouteApp extends StatelessWidget {
     return MaterialApp(
       title: 'ReRoute - Dynamic Delivery Optimization',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       home: const HomeScreen(),
     );
   }

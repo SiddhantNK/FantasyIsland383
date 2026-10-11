@@ -63,35 +63,48 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfaceDark,
-        title: const Text('Backend API URL'),
+        backgroundColor: AppTheme.surfaceWhite,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AppTheme.border),
+        ),
+        title: const Text(
+          'Backend API Connection',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Set the backend host (use 10.0.2.2 for Android emulator or 127.0.0.1 for desktop/web):',
-              style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              'Set the backend host URL (use 127.0.0.1 for desktop/web or 10.0.2.2 for Android emulator):',
+              style: TextStyle(fontSize: 13, color: AppTheme.textMuted, height: 1.4),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             TextField(
               controller: controller,
-              decoration: const InputDecoration(labelText: 'Base URL'),
+              decoration: const InputDecoration(
+                labelText: 'Base URL',
+                prefixIcon: Icon(Icons.link_rounded, size: 18, color: AppTheme.textMuted),
+              ),
             ),
           ],
         ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: () {
               ApiService.baseUrl = controller.text.trim();
               Navigator.pop(ctx);
               _refreshData();
             },
-            child: const Text('Save & Reconnect'),
+            icon: const Icon(Icons.check_rounded, size: 16),
+            label: const Text('Save & Reconnect'),
           ),
         ],
       ),
@@ -101,35 +114,74 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.bgLight,
       appBar: AppBar(
+        backgroundColor: AppTheme.surfaceWhite,
+        surfaceTintColor: Colors.transparent,
+        titleSpacing: 24,
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [AppTheme.primaryGradientStart, AppTheme.primaryGradientEnd],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(9),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primary.withValues(alpha: 0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.alt_route_rounded, color: Colors.white, size: 20),
+              child: const Icon(Icons.alt_route_rounded, color: Colors.white, size: 19),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             const Text(
               'ReRoute',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textMain,
+                letterSpacing: -0.3,
+              ),
             ),
-            const SizedBox(width: 16),
-            // Connection status pill
-            GestureDetector(
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceElevated,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: const Text(
+                'DISPATCH',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+            ),
+            const SizedBox(width: 18),
+            // Connection status badge
+            InkWell(
               onTap: _showBackendSettings,
+              borderRadius: BorderRadius.circular(20),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                 decoration: BoxDecoration(
-                  color: _isConnected ? AppTheme.emerald.withOpacity(0.15) : AppTheme.rose.withOpacity(0.15),
+                  color: _isConnected ? AppTheme.emeraldSoft : AppTheme.roseSoft,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: _isConnected ? AppTheme.emerald : AppTheme.rose,
+                    color: _isConnected
+                        ? AppTheme.emerald.withValues(alpha: 0.3)
+                        : AppTheme.rose.withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
@@ -144,17 +196,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 7),
                     Text(
                       _isConnected ? 'API Live (${_engine.toUpperCase()})' : 'API Offline',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _isConnected ? AppTheme.emeraldLight : AppTheme.roseLight,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: _isConnected ? AppTheme.emerald : AppTheme.rose,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.settings, size: 12, color: AppTheme.textMuted),
+                    const SizedBox(width: 5),
+                    Icon(
+                      Icons.settings_outlined,
+                      size: 13,
+                      color: _isConnected ? AppTheme.emerald : AppTheme.rose,
+                    ),
                   ],
                 ),
               ),
@@ -162,37 +218,47 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'Refresh All',
-            icon: const Icon(Icons.refresh, color: AppTheme.textMuted),
-            onPressed: _refreshData,
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: OutlinedButton.icon(
+              onPressed: _refreshData,
+              icon: const Icon(Icons.sync_rounded, size: 15),
+              label: const Text('Refresh'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
           ),
-          const SizedBox(width: 10),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
             decoration: const BoxDecoration(
+              color: AppTheme.surfaceWhite,
               border: Border(bottom: BorderSide(color: AppTheme.border)),
             ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _navTab(0, 'Driver Portal', Icons.local_shipping_outlined),
-                  const SizedBox(width: 12),
-                  _navTab(1, 'Dispatcher Console', Icons.dashboard_outlined),
-                  const SizedBox(width: 12),
-                  _navTab(2, 'Audit History', Icons.history_rounded),
-                ],
-              ),
+            child: Row(
+              children: [
+                _navTab(0, 'Driver Portal', Icons.local_shipping_outlined),
+                const SizedBox(width: 8),
+                _navTab(1, 'Dispatcher Console', Icons.dashboard_outlined),
+                const SizedBox(width: 8),
+                _navTab(2, 'Audit History', Icons.history_rounded),
+              ],
             ),
           ),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: AppTheme.primary,
+              ),
+            )
           : !_isConnected
               ? _buildOfflineState()
               : IndexedStack(
@@ -216,21 +282,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _navTab(int index, String title, IconData icon) {
     final selected = _currentTabIndex == index;
-    return GestureDetector(
+    return InkWell(
       onTap: () => setState(() => _currentTabIndex = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primary.withOpacity(0.18) : Colors.transparent,
+          color: selected ? AppTheme.primarySoft : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: selected ? AppTheme.primary : Colors.transparent),
+          border: Border.all(
+            color: selected ? AppTheme.primary.withValues(alpha: 0.3) : Colors.transparent,
+            width: 1,
+          ),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
               size: 16,
-              color: selected ? AppTheme.primaryLight : AppTheme.textMuted,
+              color: selected ? AppTheme.primary : AppTheme.textMuted,
             ),
             const SizedBox(width: 8),
             Text(
@@ -238,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? AppTheme.primaryLight : AppTheme.textMuted,
+                color: selected ? AppTheme.primary : AppTheme.textSecondary,
               ),
             ),
           ],
@@ -250,41 +322,60 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildOfflineState() {
     return Center(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 450),
+        constraints: const BoxConstraints(maxWidth: 460),
         margin: const EdgeInsets.all(24),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceCard,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.rose.withOpacity(0.4)),
+          color: AppTheme.surfaceWhite,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.border),
+          boxShadow: AppTheme.shadowCard,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_rounded, color: AppTheme.rose, size: 48),
-            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.roseSoft,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.cloud_off_rounded, color: AppTheme.rose, size: 36),
+            ),
+            const SizedBox(height: 18),
             const Text(
               'Cannot reach ReRoute Backend',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textMain),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textMain,
+                letterSpacing: -0.2,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Make sure your FastAPI server is running on ${ApiService.baseUrl}.\nRun command:\nuvicorn app.main:app --reload --host 0.0.0.0 --port 8000',
+              'Ensure your backend server is running on ${ApiService.baseUrl}.\nStart command:\npython -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.textMuted,
+                height: 1.5,
+              ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                OutlinedButton(
+                OutlinedButton.icon(
                   onPressed: _showBackendSettings,
-                  child: const Text('Change URL'),
+                  icon: const Icon(Icons.settings_outlined, size: 15),
+                  label: const Text('Change URL'),
                 ),
                 const SizedBox(width: 12),
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: _refreshData,
-                  child: const Text('Retry Connection'),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Retry Connection'),
                 ),
               ],
             ),
