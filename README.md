@@ -1,43 +1,41 @@
-<h1>ReRoute</h1>
+# 🗺️ ReRoute
 
-<div align="center-left"> <img src="assest/dypimg.png" alt=" " width="80" align="right">
+<img src="assets/dypimg.png" align="right" width="250" alt="ReRoute System Overview">
 
+Re-plans delivery routes when something goes wrong on the road.  
+Built for the **VORTEXA 3.0 Hackathon** by **Team FantasyIsland383**.
 
-Re-plans delivery routes when something goes wrong on the road.
+<br clear="right">
 
-Built for VORTEXA 3.0 Hackathon by Team FantasyIsland383. </div>
-
-
-## The problem
+## 🚩 The Problem
 
 A delivery plan is only correct until the first thing goes wrong. A truck breaks down at 11:30, a road gets closed, a customer calls with an urgent order. The dispatcher ends up re-planning by hand over phone calls and a spreadsheet, and it is easy to overload a vehicle, miss a delivery window, or accidentally redo a stop that was already finished.
 
-## What ReRoute does    
+## ✨ What ReRoute Does
 
 Drivers report what happened from their phone. The dispatcher checks the report and confirms it. Then the planner rebuilds the remaining routes and shows exactly what changed and why.
 
-- **Three kinds of incident:** vehicle breakdown, road closure, urgent order.
-- **Two ways to report:** a short form, or plain text such as *"V02 broke down near C04 at 11:30, can't continue"*. Gemini reads the text and fills in the form; the driver can see and fix what it understood.
-- **The dispatcher is always in the loop.** Nothing changes in the plan until the dispatcher confirms the incident.
-- **The AI never plans routes.** It only reads text. Routing, capacity checks and time windows are plain code and Google OR-Tools.
-- **Every order gets a verdict:** Kept (unchanged), Moved (different vehicle or time) or Broken (can't be delivered), with a reason.
+- **🚑 Three kinds of incident:** Vehicle breakdown, road closure, and urgent order.
+- **🤖 AI-Powered Reporting:** A short form, or plain text such as *"V02 broke down near C04 at 11:30, can't continue"*. Gemini reads the text and fills in the form; the driver can see and fix what it understood.
+- **👨‍✈️ Dispatcher in control:** Nothing changes in the plan until the dispatcher confirms the incident.
+- **⚙️ Reliable Planning:** The AI never plans routes. It only reads text. Routing, capacity checks, and time windows are handled by Google OR-Tools.
+- **📋 Clear Results:** Every order gets a verdict: **Kept** (unchanged), **Moved** (different vehicle or time), or **Broken** (can't be delivered), with a reason.
 
-## Screenshots
+## 📱 Screenshots
 
 The ReRoute mobile interface includes separate experiences for drivers and dispatchers.
 
-Driver Panel
-Driver Dashboard	Report Incident — Form
-<img src="docs/screenshots/driver-dashboard.png" width="220">	<img src="docs/screenshots/driver-form.png" width="220">
-Report Incident — AI Parser
-<img src="docs/screenshots/driver-parser.png" width="220">
-Admin / Dispatcher Panel
-Dispatcher Dashboard	Route Map
-<img src="docs/screenshots/admin-dashboard.png" width="220">	<img src="docs/screenshots/route-map.png" width="220">
-Fleet Overview	Delivery Manifest
-<img src="docs/screenshots/fleet-overview.png" width="220">	<img src="docs/screenshots/manifest.png" width="220">
+### Driver Panel
+| Driver Dashboard | Report Incident — Form | Report Incident — AI Parser |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/driver-dashboard.png" width="220" alt="Driver Dashboard"> | <img src="docs/screenshots/driver-form.png" width="220" alt="Driver Form"> | <img src="docs/screenshots/driver-parser.png" width="220" alt="Driver Parser"> |
 
-## How it works
+### Admin / Dispatcher Panel
+| Dispatcher Dashboard | Route Map | Fleet Overview | Delivery Manifest |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/admin-dashboard.png" width="220" alt="Admin Dashboard"> | <img src="docs/screenshots/route-map.png" width="220" alt="Route Map"> | <img src="docs/screenshots/fleet-overview.png" width="220" alt="Fleet Overview"> | <img src="docs/screenshots/manifest.png" width="220" alt="Manifest"> |
+
+## 🛠️ How it works
 
 ```mermaid
 flowchart TD
@@ -80,56 +78,56 @@ flowchart LR
     API --> DB[("Supabase PostgreSQL")]
 ```
 
-## MVP
+## 🌟 MVP
 
 What works today:
 
-- Initial plan for 3 vehicles and 10 orders with capacity and time-window constraints
-- Arrival, waiting and departure times for every stop
-- Driver screen with the incident form and the AI text parser
-- Dispatcher dashboard: pending incidents, confirm / reject, generate plan, reset the demo
-- Re-planning for all three incident types
-- Original vs revised plan, with Kept / Moved / Broken and reasons
-- Route map, replanning history, light theme
-- Works with or without a database (in-memory demo mode)
-- Backend tests for the solver, re-planner and service layer
+- **📅 Initial Planning:** 3 vehicles and 10 orders with capacity and time-window constraints.
+- **⏱️ Precise Timing:** Arrival, waiting, and departure times for every stop.
+- **📲 Driver App:** Incident reporting via form and AI-powered text parser.
+- **🖥️ Dispatcher Dashboard:** Manage pending incidents, confirm/reject, and re-plan.
+- **🔄 Smart Re-planning:** Handles breakdowns, closures, and urgent orders.
+- **📈 Plan Comparison:** Original vs. revised plans with status (Kept/Moved/Broken).
+- **🗺️ Visuals:** Route map and re-planning history.
+- **💾 Flexible Data:** Works with or without a database (in-memory demo mode).
+- **🧪 Robust Backend:** Comprehensive tests for solver, re-planner, and services.
 
-Left out on purpose: live GPS, live traffic, automatic location detection, real road maps. Travel times come from a simulated matrix, and sign-in on this branch is a simple role picker (no passwords).
+> **Note:** Left out on purpose: live GPS, live traffic, automatic location detection, real road maps. Travel times come from a simulated matrix, and sign-in on this branch is a simple role picker.
 
-## Tech stack
+## 💻 Tech Stack
 
-| Part | What we used |
-|---|---|
-| App | Flutter (Dart), `http`, `google_fonts` |
-| Backend | Python, FastAPI, Uvicorn |
-| Route optimization | Google OR-Tools |
-| Incident parser | Gemini API (`google-genai`) |
-| Database | Supabase PostgreSQL |
-| Testing | pytest |
-| Config | python-dotenv |
+| Part | Technology |
+| :--- | :--- |
+| **App** | Flutter (Dart), `http`, `google_fonts` |
+| **Backend** | Python, FastAPI, Uvicorn |
+| **Route Optimization** | Google OR-Tools |
+| **Incident Parser** | Gemini API (`google-genai`) |
+| **Database** | Supabase PostgreSQL |
+| **Testing** | pytest |
+| **Config** | python-dotenv |
 
-## Requirements
+## 📋 Requirements
 
 **Backend (any machine)**
 - Python 3.10 or newer
-- A Supabase project, or nothing at all: `REROUTE_REPO=memory` runs on built-in demo data
-- A Gemini API key, only if you want the AI text parser
+- A Supabase project, or nothing at all: `REROUTE_REPO=memory` runs on built-in demo data.
+- A Gemini API key, only if you want the AI text parser.
 
-**App, all platforms**
-- Flutter stable with Dart 3.13.5 or newer (see `reroute_app/pubspec.yaml`)
-- The backend running and reachable from the device
+**App (all platforms)**
+- Flutter stable with Dart 3.13.5 or newer (see `reroute_app/pubspec.yaml`).
+- The backend running and reachable from the device.
 
 **On a phone**
-- Android: Android Studio with the Android SDK, plus an emulator or a real phone with USB debugging on
-- iPhone: a Mac with Xcode (simulator or a real device)
-- A real phone and the laptop must be on the same Wi-Fi network
+- Android: Android Studio with the Android SDK, plus an emulator or a real phone with USB debugging on.
+- iPhone: a Mac with Xcode (simulator or a real device).
+- A real phone and the laptop must be on the same Wi-Fi network.
 
 **On desktop or web**
-- Web: Chrome
-- Windows: Visual Studio with the "Desktop development with C++" workload
-- macOS: Xcode. Linux: the usual Flutter Linux build tools (`flutter doctor` tells you what is missing)
+- Web: Chrome.
+- Windows: Visual Studio with the "Desktop development with C++" workload.
+- macOS: Xcode. Linux: the usual Flutter Linux build tools (`flutter doctor` tells you what is missing).
 
-## Getting started
+## 🚀 Getting Started
 
 ### 1. Backend
 
@@ -185,29 +183,29 @@ If a real phone can't connect, check that the laptop's firewall allows port 8000
 4. Back as Dispatcher, open the pending incidents and confirm one.
 5. Open the revised plan: check what was Kept, Moved or Broken, and that finished stops didn't move.
 
-## Endpoints
+## 📡 Endpoints
 
-| | |
-|---|---|
-| `GET /health`, `GET /state` | status and current data |
-| `POST /plans/initial` | build the original plan |
-| `GET /plans`, `/plans/latest`, `/plans/{id}`, `/plans/{id}/compare` | plans and comparisons |
-| `POST /incidents` | report an incident (`source`: `FORM` or `AI_PARSER`) |
-| `POST /incidents/parse` | free text to structured preview (not saved) |
-| `GET /incidents?status=PENDING`, `PATCH /incidents/{id}` | list and correct |
-| `POST /incidents/{id}/confirm`, `/reject` | dispatcher decision |
-| `GET /history`, `POST /admin/reset` | history, and a reset for demo re-runs |
+| Endpoint | Description |
+| :--- | :--- |
+| `GET /health`, `GET /state` | Status and current data |
+| `POST /plans/initial` | Build the original plan |
+| `GET /plans`, `/plans/latest`, `/plans/{id}`, `/plans/{id}/compare` | Plans and comparisons |
+| `POST /incidents` | Report an incident (`source`: `FORM` or `AI_PARSER`) |
+| `POST /incidents/parse` | Free text to structured preview (not saved) |
+| `GET /incidents?status=PENDING`, `PATCH /incidents/{id}` | List and correct |
+| `POST /incidents/{id}/confirm`, `/reject` | Dispatcher decision |
+| `GET /history`, `POST /admin/reset` | History, and a reset for demo re-runs |
 
 Times are `"HH:MM"` in JSON. A stop with `vehicle_id = null` is an unassigned order (Broken, with a reason).
 
-## Tests
+## 🧪 Tests
 
 ```bash
 cd reroute-backend
 pytest -q
 ```
 
-## Project layout
+## 📁 Project Layout
 
 ```
 reroute-backend/   FastAPI app, solver, re-planner, SQL (db/), tests
@@ -215,7 +213,7 @@ reroute_app/       Flutter app (driver, dispatcher and history screens)
 requirements.txt   Python dependencies
 ```
 
-## Team
+## 👥 Team
 
 **Team FantasyIsland383**
 
