@@ -15,7 +15,7 @@ from supabase import create_client
 load_dotenv()
 db = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 llm = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 EVENTS = {"VEHICLE_FAILURE", "ROAD_CLOSURE", "URGENT_ORDER"}
 REQUIRED = {
