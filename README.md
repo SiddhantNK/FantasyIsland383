@@ -33,7 +33,7 @@ The ReRoute mobile interface includes separate experiences for drivers and dispa
 ### Admin / Dispatcher Panel
 | Starting Screen | Route Map | Fleet Overview | Delivery Manifest |
 | :---: | :---: | :---: | :---: |
-| <img src="docs/screenshots/starting-screen.jpeg" width="220" alt="Admin Dashboard"> | <img src="docs/screenshots/route-map.jpeg" width="220" alt="Route Map"> | <img src="docs/screenshots/fleet-overview.jpeg" width="220" alt="Fleet Overview"> | <img src="docs/screenshots/route-manifest.jpeg" width="220" alt="Manifest"> |
+| <img src="docs/screenshots/starting-login.jpeg" width="220" alt="Admin Dashboard"> | <img src="docs/screenshots/route-map.jpeg" width="220" alt="Route Map"> | <img src="docs/screenshots/fleet-overview.jpeg" width="220" alt="Fleet Overview"> | <img src="docs/screenshots/route-manifest.jpeg" width="220" alt="Manifest"> |
 
 ## 🛠️ How it works
 
