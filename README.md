@@ -28,12 +28,12 @@ The ReRoute mobile interface includes separate experiences for drivers and dispa
 ### Driver Panel
 | Driver Dashboard | Report Incident — Form | Report Incident — AI Parser |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/driver-dashboard.jpeg" width="220" alt="Driver Dashboard"> | <img src="docs/screenshots/driver-form.png" width="220" alt="Driver Form"> | <img src="docs/screenshots/driver-parser.png" width="220" alt="Driver Parser"> |
+| <img src="docs/screenshots/driver-dashboard.jpeg" width="220" alt="Driver Dashboard"> | <img src="docs/screenshots/reporting-screen-form-version.jpeg" width="220" alt="Driver Form"> | <img src="docs/screenshots/reporting-screen-ai-version.jpeg" width="220" alt="Driver Parser"> |
 
 ### Admin / Dispatcher Panel
-| Dispatcher Dashboard | Route Map | Fleet Overview | Delivery Manifest |
+| Starting Screen | Route Map | Fleet Overview | Delivery Manifest |
 | :---: | :---: | :---: | :---: |
-| <img src="docs/screenshots/admin-dashboard.png" width="220" alt="Admin Dashboard"> | <img src="docs/screenshots/route-map.png" width="220" alt="Route Map"> | <img src="docs/screenshots/fleet-overview.png" width="220" alt="Fleet Overview"> | <img src="docs/screenshots/manifest.png" width="220" alt="Manifest"> |
+| <img src="docs/screenshots/starting-screen.jpeg" width="220" alt="Admin Dashboard"> | <img src="docs/screenshots/route-map.jpeg" width="220" alt="Route Map"> | <img src="docs/screenshots/fleet-overview.jpeg" width="220" alt="Fleet Overview"> | <img src="docs/screenshots/route-manifest.jpeg" width="220" alt="Manifest"> |
 
 ## 🛠️ How it works
 
