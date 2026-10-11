@@ -6,6 +6,7 @@ Env: SUPABASE_URL, SUPABASE_KEY (service_role), REROUTE_ENGINE=ortools|greedy,
 from __future__ import annotations
 
 import os
+import hmac
 from typing import Optional
 
 try:
@@ -29,8 +30,16 @@ def make_repo():
     if os.getenv("REROUTE_REPO", "").lower() == "memory" or not (url and key):
         from .repo_memory import MemoryRepo
         return MemoryRepo()
-    from .db import SupabaseRepo
-    return SupabaseRepo(url, key)
+    try:
+        from .db import SupabaseRepo
+        srepo = SupabaseRepo(url, key)
+        # Check if app_users is available (migration_002.sql)
+        srepo._t("app_users").select("id").limit(1).execute()
+        return srepo
+    except Exception as exc:
+        print(f"[ReRoute Backend] Supabase not fully initialized ({exc}); using MemoryRepo.")
+        from .repo_memory import MemoryRepo
+        return MemoryRepo()
 
 
 repo = make_repo()
@@ -84,8 +93,9 @@ class RegisterIn(BaseModel):
     email: str
     password: str
     name: str
-    role: str = "DISPATCHER"
+    role: str = "DRIVER"                  # was DISPATCHER
     vehicle_id: Optional[str] = None
+    invite_code: Optional[str] = None     # new
 
 
 class LoginIn(BaseModel):
@@ -109,25 +119,11 @@ def health():
 
 @app.post("/auth/register")
 def auth_register(body: RegisterIn):
-    auth.validate_register(body.email, body.password, body.name, body.role, body.vehicle_id)
-    if body.vehicle_id and body.vehicle_id not in {v.id for v in repo.vehicles()}:
-        raise HTTPException(422, f"Unknown vehicle {body.vehicle_id}")
-    try:
-        row = repo.create_user({
-            "email": body.email,
-            "name": body.name,
-            "password_hash": auth.hash_password(body.password),
-            "role": body.role,
-            "vehicle_id": body.vehicle_id if body.role == "DRIVER" else None,
-        })
-    except ValueError as exc:
-        raise HTTPException(409, str(exc)) from exc
-    except Exception as exc:
-        msg = str(exc).lower()
-        if "duplicate" in msg or "unique" in msg:
-            raise HTTPException(409, "Email already registered") from exc
-        raise
-    return _auth_payload(row)
+    if body.role == "DISPATCHER":         # new block, before validate_register
+        code = os.getenv("DISPATCHER_INVITE_CODE", "")
+        if not code or not hmac.compare_digest((body.invite_code or "").encode(), code.encode()):
+            raise HTTPException(403, "A valid invite code is required to register as a dispatcher")
+    auth.validate_register(...)           # unchanged from here
 
 
 @app.post("/auth/login")

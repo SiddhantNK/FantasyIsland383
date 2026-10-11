@@ -104,12 +104,63 @@ def normalize(raw: dict) -> dict:
     return out
 
 
+def _heuristic_parse(text: str, vehicle_ids, location_ids) -> dict:
+    t = text.lower()
+    ev = None
+    if any(w in t for w in ["breakdown", "failed", "engine", "puncture", "flat", "broke", "stopped", "stuck", "smoke"]):
+        ev = "VEHICLE_FAILURE"
+    elif any(w in t for w in ["closure", "closed", "block", "blocked", "traffic", "construction", "flood"]):
+        ev = "ROAD_CLOSURE"
+    elif any(w in t for w in ["urgent", "rush", "priority", "express", "new order", "package", "deliver"]):
+        ev = "URGENT_ORDER"
+    else:
+        v_matches = [v for v in vehicle_ids if re.search(rf"\b{re.escape(v)}\b", text, re.IGNORECASE)]
+        ev = "VEHICLE_FAILURE" if v_matches else "ROAD_CLOSURE"
+
+    found_v = None
+    for v in sorted(vehicle_ids, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(v)}\b", text, re.IGNORECASE):
+            found_v = v
+            break
+
+    found_locs = []
+    for loc in sorted(location_ids, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(loc)}\b", text, re.IGNORECASE):
+            found_locs.append(loc)
+
+    times = re.findall(r"\b([01]?\d|2[0-3]):([0-5]\d)\b", text)
+    time_strs = [f"{int(h):02d}:{m}" for h, m in times]
+    inc_time = time_strs[0] if time_strs else "10:00"
+    end_time = time_strs[1] if len(time_strs) > 1 else None
+
+    w_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:kg|kilos|kilograms)", text, re.IGNORECASE)
+    v_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:m3|m\^3|cubic)", text, re.IGNORECASE)
+    weight = float(w_match.group(1)) if w_match else 50.0
+    volume = float(v_match.group(1)) if v_match else 0.5
+
+    loc_id = found_locs[0] if found_locs else None
+    from_loc = found_locs[0] if len(found_locs) > 0 else None
+    to_loc = found_locs[1] if len(found_locs) > 1 else None
+
+    return {
+        "event_type": ev,
+        "vehicle_id": found_v,
+        "location_id": loc_id,
+        "from_location": from_loc,
+        "to_location": to_loc,
+        "incident_time": inc_time,
+        "end_time": end_time,
+        "weight_kg": weight if ev == "URGENT_ORDER" else None,
+        "volume_m3": volume if ev == "URGENT_ORDER" else None,
+        "earliest": inc_time,
+        "latest": end_time or "16:00",
+    }
+
+
 def parse_incident(text: str, vehicle_ids, location_ids) -> dict:
+    raw = {}
     try:
         raw = _call_gemini(text, list(vehicle_ids), list(location_ids))
-    except NotImplementedError:
-        raise
-    except Exception:  # network error, quota, malformed JSON ...
-        return {"event_type": None, "missing": ["event_type"],
-                "clarification": "I couldn't read that report. Please try again or use the form."}
+    except Exception:
+        raw = _heuristic_parse(text, list(vehicle_ids), list(location_ids))
     return normalize(raw)

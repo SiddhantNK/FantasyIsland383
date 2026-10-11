@@ -21,9 +21,11 @@ _ITERATIONS = 120_000
 _bearer = HTTPBearer(auto_error=False)
 
 
-def auth_secret() -> str:
-    return os.getenv("AUTH_SECRET", "reroute-dev-secret-change-me")
+import secrets
+_FALLBACK = secrets.token_urlsafe(32)   # random per run
 
+def auth_secret() -> str:
+    return os.getenv("AUTH_SECRET") or _FALLBACK
 
 def public_user(row: dict) -> dict:
     return {
